@@ -1,0 +1,9 @@
+#%SimplAPI=1.0
+
+library: work
+top: package_tb
+
+dependencies:
+- ../package.yml
+files:
+- package_tb.vhd

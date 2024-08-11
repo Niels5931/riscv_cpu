@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+project: package
+part: INSERT_PART_HERE
+top: package
+
+dependencies:
+- ../package.yml

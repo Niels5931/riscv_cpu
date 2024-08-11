@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+project: ins_dec
+part: xc7a35tcpg236-1
+top: ins_dec
+
+dependencies:
+- ../ins_dec.yml

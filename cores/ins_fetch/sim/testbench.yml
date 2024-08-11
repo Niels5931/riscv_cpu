@@ -1,0 +1,9 @@
+#%SimplAPI=1.0
+
+library: work
+top: ins_fetch_tb
+
+dependencies:
+- ../ins_fetch.yml
+files:
+- ins_fetch_tb.vhd
