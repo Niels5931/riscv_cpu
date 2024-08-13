@@ -24,17 +24,23 @@ port (
 	---------------------
 	opcode_o : out std_logic_vector(6 downto 0);
 	rs1_o : out std_logic_vector(31 downto 0);
+	rs1_addr_o : out std_logic_vector(4 downto 0);
 	rs2_o : out std_logic_vector(31 downto 0);
-	rd_o : out std_logic_vector(31 downto 0);
+	rs2_addr_o : out std_logic_vector(4 downto 0);
+	rd_o : out std_logic_vector(4 downto 0);
+	pc_o : out std_logic_vector(31 downto 0);
 	funct3_o : out std_logic_vector(2 downto 0);
 	funct7_o : out std_logic_vector(6 downto 0);
 	imm_o : out std_logic_vector(31 downto 0);
 	wb_en_o : out std_logic; -- write back enable
+	data_mem_wr_en_o : out std_logic; -- data memory enable
+	data_mem_rd_en_o : out std_logic; -- data memory enable
 	-- data forwarding stuff
 	---------------------
 	-- EXECUTE INPUTS --
 	---------------------
 	zero_i : in std_logic;
+	lt_i : in std_logic; -- rs1 < rs2
 	---------------------
 	-- WRITE BACK INPUTS --
 	---------------------
@@ -72,16 +78,23 @@ architecture rtl of ins_dec is
 	signal funct7_s : std_logic_vector(6 downto 0);
 	signal rs1_s : std_logic_vector(31 downto 0);
 	signal rs2_s : std_logic_vector(31 downto 0);
-	signal rd_s : std_logic_vector(31 downto 0);
+	signal rd_s : std_logic_vector(4 downto 0);
 	signal imm_s : std_logic_vector(31 downto 0);
-
+	signal data_mem_wr_en_s : std_logic;
+	signal data_mem_rd_en_s : std_logic;
+	
 	signal opcode_reg : std_logic_vector(6 downto 0);
 	signal funct3_reg : std_logic_vector(2 downto 0);
 	signal funct7_reg : std_logic_vector(6 downto 0);
 	signal rs1_reg : std_logic_vector(31 downto 0);
+	signal rs1_addr_reg : std_logic_vector(4 downto 0);
 	signal rs2_reg : std_logic_vector(31 downto 0);
-	signal rd_reg : std_logic_vector(31 downto 0);
+	signal rs2_addr_reg : std_logic_vector(4 downto 0);
+	signal rd_reg : std_logic_vector(4 downto 0);
+	signal pc_reg : std_logic_vector(31 downto 0);
 	signal imm_reg : std_logic_vector(31 downto 0);
+	signal data_mem_wr_en_reg : std_logic;
+	signal data_mem_rd_en_reg : std_logic;
 
 	signal jmp_addr_s : std_logic_vector(31 downto 0);
 	signal jmp_valid_s : std_logic;
@@ -103,6 +116,9 @@ begin
 	opcode_s <= ins_data_i(6 downto 0);
 	funct3_s <= ins_data_i(14 downto 12);
 	funct7_s <= ins_data_i(31 downto 25);
+	data_mem_wr_en_s <= '1' when opcode_s = "0100011" else '0';
+	data_mem_rd_en_s <= '1' when opcode_s = "0000011" else '0';	
+	wb_en_s <= '1' when is_r_instr = '1' or is_i_instr = '1' or is_u_instr = '1' or is_j_instr = '1' else '0';
 
 	-- decode instruction type
 	is_r_instr <= '1' when opcode_s = "0110011" else '0';
@@ -111,32 +127,32 @@ begin
 	is_b_instr <= '1' when opcode_s = "1100011" else '0';
 	is_u_instr <= '1' when opcode_s = "0110111" or opcode_s = "0010111" else '0';
 	is_j_instr <= '1' when opcode_s = "1101111" else '0';
-	is_b_instr_ex <= '1' when opcode_reg = "1100011" else '0';
+	is_b_instr_ex_s <= '1' when opcode_reg = "1100011" else '0';
 
 	-- immediate assignment
 	process(all)
 	begin
-			if is_i_instr = '1' then
-				imm_s <= sign_ext(ins_data_i(31),21) & ins_data_i(30 downto 20);
-			elsif is_s_instr = '1' then
-				imm_s <= sign_ext(ins_data_i(31), 21) & ins_data_i(30 downto 25) & ins_data_i(11 downto 7);
-			elsif is_b_instr = '1' then
-				imm_s <= sign_ext(ins_data_i(31), 21) & ins_data_i(7) & ins_data_i(30 downto 25) & ins_data_i(11 downto 8) & "0";
-			elsif is_u_instr = '1' then
-				imm_s <= ins_data_i(31 downto 12) & "000000000000";
-			elsif is_j_instr = '1' then
-				imm_s <= sign_ext(ins_data_i(31), 12) & ins_data_i(19 downto 12) & ins_data_i(20) & ins_data_i(30 downto 21) & "0";
-			else
-				imm_s <= (others => '0');
-			end if;
-		end process;
+		if is_i_instr = '1' then
+			imm_s <= sign_ext(ins_data_i(31),21) & ins_data_i(30 downto 20);
+		elsif is_s_instr = '1' then
+			imm_s <= sign_ext(ins_data_i(31), 21) & ins_data_i(30 downto 25) & ins_data_i(11 downto 7);
+		elsif is_b_instr = '1' then
+			imm_s <= sign_ext(ins_data_i(31), 20) & ins_data_i(7) & ins_data_i(30 downto 25) & ins_data_i(11 downto 8) & "0";
+		elsif is_u_instr = '1' then
+			imm_s <= ins_data_i(31 downto 12) & "000000000000";
+		elsif is_j_instr = '1' then
+			imm_s <= sign_ext(ins_data_i(31), 12) & ins_data_i(19 downto 12) & ins_data_i(20) & ins_data_i(30 downto 21) & "0";
+		else
+			imm_s <= (others => '0');
+		end if;
+	end process;
 
 	-- regfile thingy
-	process(clk_i, rst_i)
+	process(clk_i, rst_i, reg_wr_en_i, reg_wr_addr_i, reg_wr_data_i, ins_data_i)
 	begin
-		rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
+		rs1_s <= reg_file((TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
 		rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
-		rd_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(11 downto 7))));
+		rd_s <= ins_data_i(11 downto 7));
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
 				for i in 0 to 31 loop
@@ -165,27 +181,79 @@ begin
 	-- branch result
 	process(all)
 	begin
-		case is_b_instr_ex is =>
+		branch_taken_s <= '0';
+		case is_b_instr_ex_s is
 			when '1' =>
-				if 
+				if funct3_reg = "000" and zero_i = '1' then -- beq
+					branch_taken_s <= '1';
+				elsif funct3_reg = "001" and zero_i = '0' then -- bne
+					branch_taken_s <= '1';
+				elsif (funct3_reg = "100" or funct3_reg = "110") and lt_i = '1' then -- blt, bltu
+					branch_taken_s <= '1';
+				elsif (funct3_reg = "101" or funct3_reg = "111") and lt_i = '0' then -- bge, bgeu
+					branch_taken_s <= '1';
+				end if;
+			when others =>
+				branch_taken_s <= '0';
+		end case;
+	end process;
 
 	-- branch prediction statemachine
 	process(all)
 	begin
-		jump_addr_s <= pc_i + imm_s;
-		-- when jump instruction assign jump address and make valid
-		if is_j_instr = '1' then
-			jmp_valid_s <= '1';
-		elsif is_b_instr = '1' then
-			case state_reg is
-				when NOT_TAKEN_TWO => 
-					if is_j_instr_reg = '1' and
-
-
-
-		 
-
-
+		jmp_valid_s <= is_j_instr;
+		jmp_addr_s <= pc_i + imm_s;
+		next_state <= state_reg;
+		jmp_addr_buf_en <= '0';
+		pc_buf_en <= '0';
+		case state_reg is 
+			when NOT_TAKEN_TWO =>
+				if branch_taken_s = '1' then
+					next_state <= NOT_TAKEN_ONE;
+					jmp_valid_s <= '1';
+					jmp_addr_s <= jmp_addr_buf;
+				end if;
+				if is_b_instr = '1' then
+					jmp_addr_buf_en <= '1';
+				end if;
+			when NOT_TAKEN_ONE =>
+				if branch_taken_s = '1' then
+					next_state <= TAKEN_ONE;
+					jmp_valid_s <= '1';
+					jmp_addr_s <= jmp_addr_buf;
+				elsif is_b_instr_ex_s = '1' then
+					next_state <= NOT_TAKEN_TWO;
+				end if;
+				if is_b_instr = '1' then
+					jmp_addr_buf_en <= '1';
+				end if;
+			when TAKEN_ONE =>
+				if is_b_instr_ex_s = '1' and branch_taken_s = '0' then
+					jmp_valid_s <= '1';
+					jmp_addr_s <= pc_buf;
+				elsif is_b_instr = '1' then
+					pc_buf_en <= '1';
+					jmp_valid_s <= '1';
+				end if;
+				if branch_taken_s = '0' and is_b_instr_ex_s = '1' then
+					next_state <= NOT_TAKEN_ONE;
+				elsif branch_taken_s = '1' then
+					next_state <= TAKEN_TWO;
+				end if;
+			when TAKEN_TWO =>
+				if is_b_instr_ex_s = '1' and branch_taken_s = '0' then
+					jmp_valid_s <= '1';
+					jmp_addr_s <= pc_buf;
+					next_state <= TAKEN_ONE;
+				elsif is_b_instr = '1' then
+					pc_buf_en <= '1';
+					jmp_valid_s <= '1';
+				end if;
+			when others =>
+				next_state <= NOT_TAKEN_ONE;
+		end case;
+	end process;
+				
 	-- branch prediction buffers; store jump address and pc to correct for mispredictions
 	process(clk_i, rst_i)
 	begin
@@ -193,15 +261,13 @@ begin
 			if rst_i = '1' then
 				jmp_addr_buf <= (others => '0');
 				pc_buf <= (others => '0');
-				is_b_instr_reg <= '0';
 			else
 				if jmp_addr_buf_en = '1' then
 					jmp_addr_buf <= jmp_addr_s;
 				end if;
 				if pc_buf_en = '1' then
-					pc_buf <= pc_i;
+					pc_buf <= pc_i + 4;
 				end if;
-				is_b_instr_reg <= is_b_instr;
 			end if;
 		end if;
 	end process;
@@ -217,8 +283,13 @@ begin
 				rs1_reg <= (others => '0');
 				rs2_reg <= (others => '0');
 				rd_reg <= (others => '0');
+				pc_reg <= (others => '0');
 				imm_reg <= (others => '0');
+				data_mem_wr_en_reg <= '0';
+				data_mem_rd_en_reg <= '0';
 				wb_en_reg <= '0';
+				rs1_addr_reg <= (others => '0');
+				rs2_addr_reg <= (others => '0');
 			else
 				opcode_reg <= opcode_s;
 				funct3_reg <= funct3_s;
@@ -226,8 +297,13 @@ begin
 				rs1_reg <= rs1_s;
 				rs2_reg <= rs2_s;
 				rd_reg <= rd_s;
+				pc_reg <= pc_i;
 				imm_reg <= imm_s;
+				data_mem_wr_en_reg <= data_mem_wr_en_s;
+				data_mem_rd_en_reg <= data_mem_rd_en_s;
 				wb_en_reg <= wb_en_s;
+				rs1_addr_reg <= ins_data_i(19 downto 15);
+				rs2_addr_reg <= ins_data_i(24 downto 20);
 			end if;
 		end if;
 	end process;
@@ -237,9 +313,14 @@ begin
 	funct3_o <= funct3_reg;
 	funct7_o <= funct7_reg;
 	rs1_o <= rs1_reg;
+	rs1_addr_o <= rs1_addr_reg;
 	rs2_o <= rs2_reg;
+	rs2_addr_o <= rs2_addr_reg;
 	rd_o <= rd_reg;
 	imm_o <= imm_reg;
+	data_mem_wr_en_o <= data_mem_wr_en_reg;
+	data_mem_rd_en_o <= data_mem_rd_en_reg;
+	wb_en_o <= wb_en_reg;
 	jmp_addr_o <= jmp_addr_s;
 	jmp_valid_o <= jmp_valid_s;
 
