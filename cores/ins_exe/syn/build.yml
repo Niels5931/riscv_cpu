@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+project: ins_exe
+part: xc7a35tcpg236-1
+top: ins_exe
+
+dependencies:
+- ../ins_exe.yml

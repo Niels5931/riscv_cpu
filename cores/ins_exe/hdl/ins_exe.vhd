@@ -39,15 +39,11 @@ entity ins_exe is
 		alu_res_o : out std_logic_vector(31 downto 0);
 		mem_data_o : out std_logic_vector(31 downto 0); -- register to be stored in memory
 		funct3_o : out std_logic_vector(2 downto 0); -- for byte/halfword/word
+		rd_o : out std_logic_vector(4 downto 0); -- destination register
 		---------------------
 		-- WRITE BACK INPUTS --
 		---------------------
-		wb_rd_data_i : in std_logic_vector(31 downto 0); -- data forwarding from write back stage
-		---------------------
-		-- WRITE BACK OUTPUTS --
-		---------------------
-		reg_wr_en_o : out std_logic;
-		reg_wr_addr_o : out std_logic_vector(4 downto 0)
+		wb_rd_data_i : in std_logic_vector(31 downto 0) -- data forwarding from write back stage
 	);
 end entity;
 
@@ -67,14 +63,16 @@ architecture rtl of ins_exe is
 	signal mem_data_reg : std_logic_vector(31 downto 0);
 	signal data_mem_wr_en_reg : std_logic;
 	signal data_mem_rd_en_reg : std_logic;
-	signal wr_en_reg : std_logic;
+	signal wb_en_reg : std_logic;
 
 begin
 
 	-- ALU
-	process(opcode_i, rs1_i, rs2_i, funct3_i, funct7_i, imm_i)
+	process(all)
 	begin
-		zero_s <= '1' when alu_res_s = (others => '0') else '0';
+		zero_s <= '1' when alu_res_s = x"00000000" else '0';
+		lt_s <= '0';
+		alu_res_s <= (others => '0');
 		if opcode_i = "0110111" or opcode_i = "0010111" then
 			if funct3_i = "000" then
 				-- ADD or SUB
@@ -92,10 +90,10 @@ begin
 				alu_res_s <= std_logic_vector(shift_left(unsigned(alu_op_1_s), to_integer(unsigned(alu_op_2_s))));
 			elsif funct3_i = "010" then
 				-- SLT
-				alu_res_s <= std_logic_vector(to_unsigned((signed(alu_op_1_s) < signed(alu_op_2_s)), 32)); 
+				alu_res_s <= std_logic_vector(to_unsigned(1,32)) when (signed(alu_op_1_s) < signed(alu_op_2_s)) else std_logic_vector(to_unsigned(0,32)); 
 			elsif funct3_i = "011" then
 				-- SLTU
-				alu_res_s <= std_logic_vector(to_unsigned((unsigned(alu_op_1_s) < unsigned(alu_op_2_s)), 32));
+				alu_res_s <= std_logic_vector(to_unsigned(1,32)) when (unsigned(alu_op_1_s) < unsigned(alu_op_2_s)) else std_logic_vector(to_unsigned(0,32));
 			elsif funct3_i = "100" then
 				-- XOR
 				alu_res_s <= std_logic_vector(unsigned(alu_op_1_s) xor unsigned(alu_op_2_s));
@@ -132,8 +130,10 @@ begin
 	end process;
 
 	-- ALU operand assignment
-	process(rs1_addr_i, rs2_addr_i, rs1_i, rs2_i, imm_i, alu_res_reg, rd_reg_reg, wb_rd_data_i)
+	process(all)
 	begin
+		alu_op_1_s <= rs1_i;
+		alu_op_2_s <= rs2_i;
 		case opcode_i is 
 			when "0010011" | "0000011" | "0100011" => 
 				-- I type
@@ -186,7 +186,6 @@ begin
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
 				alu_res_reg <= (others => '0');
-				reg_wr_en_reg <= '0';
 				rd_reg <= (others => '0');
 				rd_reg_reg <= (others => '0');
 				funct3_reg <= (others => '0');
@@ -196,7 +195,6 @@ begin
 				wb_en_reg <= '0';
 			else
 				alu_res_reg <= alu_res_s;
-				reg_wr_en_reg <= reg_wr_en_i;
 				rd_reg <= rd_i;
 				rd_reg_reg <= rd_reg;
 				funct3_reg <= funct3_i;
@@ -207,6 +205,17 @@ begin
 			end if;
 		end if;
 	end process;
+
+	-- output assignments
+	zero_o <= zero_s;
+	lt_o <= lt_s;
+	alu_res_o <= alu_res_reg;
+	mem_data_o <= mem_data_reg;
+	funct3_o <= funct3_reg;
+	data_mem_wr_en_o <= data_mem_wr_en_reg;
+	data_mem_rd_en_o <= data_mem_rd_en_reg;
+	wb_en_o <= wb_en_reg;
+	rd_o <= rd_reg;
 
 end architecture;
 
