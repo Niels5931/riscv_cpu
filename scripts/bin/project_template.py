@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.9
-from os import mkdir, chdir, getcwd, listdir, getenv
+from os import mkdir, chdir, getcwd, listdir, getenv, path
 from sys import argv
 import argparse
 from remove_project import rm_dir
@@ -11,12 +11,13 @@ def main():
     argparser.add_argument("-d", "--dependencies", nargs='+', help="List of dependencies")
     args = argparser.parse_args()
     
+
     project_root = getenv("PROJECT_ROOT")
     # Get the name of the project from the command line
     project_name = args.project_name
     # check if the project directory exists
-    if project_name in listdir(getcwd()):
-        rm_dir(f"{getcwd()}/{project_name}")
+    if path.isdir(f"{project_root}/cores/{project_name}"):
+        rm_dir(f"{project_root}/cores/{project_name}")
     # Create the project directory
     chdir(f"{project_root}/cores")
     mkdir(project_name)

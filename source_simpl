@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+export PROJECT_ROOT=$PWD
+export PROJECT_NAME=$(basename "$PROJECT_ROOT")
+export PATH=$PROJECT_ROOT/scripts/bin:$PATH

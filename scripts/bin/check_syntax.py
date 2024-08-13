@@ -48,8 +48,8 @@ def main():
         #f.write(f"set_property top {argv[1]} [current_fileset]\n")
         #f.write("update_compile_order -fileset sources_1\n")
         f.write("set_property FILE_TYPE {VHDL 2008} [get_files *.vhd]\n")
-        f.write("check_syntax")
-        f.write("exit")
+        f.write("check_syntax\n")
+        f.write("exit\n")
     run(["vivado", "-mode", "tcl", "-source", "syntax_check.tcl"])
 
 if __name__ == "__main__":
