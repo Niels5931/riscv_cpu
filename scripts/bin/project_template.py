@@ -4,6 +4,58 @@ from sys import argv
 import argparse
 from remove_project import rm_dir
 
+def get_component_list(dependencies=None):
+    if dependencies == None:
+        return
+
+    port_list = []
+
+    for comp in dependencies:
+        print(comp)
+        comp_lines = open(f"{getenv('PROJECT_ROOT')}/cores/{comp}/hdl/{comp}.vhd").readlines()
+        comp_lines = [line.strip() for line in comp_lines]
+        try:
+            generic_start = comp_lines.index("generic (")
+            generic_end = comp_lines.index(");")
+        except:
+            generic_start = None
+            generic_end = None
+
+        try:
+            port_start = comp_lines.index("port (")
+            port_end = comp_lines.index(");")
+        except:
+            port_start = None
+            port_end = None
+
+        print(generic_start, generic_end)
+        print(port_start, port_end)
+
+        if generic_start:
+            for i in range(generic_start+1, generic_end):
+                comp_lines[i] = "\t" + comp_lines[i]
+
+        if port_start:
+            for i in range(port_start+1, port_end):
+                comp_lines[i] = "\t" + comp_lines[i]    
+
+        if generic_start or port_start:
+            port_list.append(f"component {comp}")
+
+        if generic_start:
+            port_list.extend(comp_lines[generic_start:generic_end+1])
+        if port_start:
+            port_list.extend(comp_lines[port_start:port_end+1])
+
+        if generic_start or port_start:
+            port_list.append(f"end component;\n")
+
+    #print(port_list)
+
+    return port_list
+            
+
+
 def main():
     
     argparser = argparse.ArgumentParser(description="Create a new project template")
@@ -49,28 +101,10 @@ def main():
         f.write(f");\n")
         f.write(f"end entity;\n\n")
         f.write(f"architecture rtl of {project_name} is\n\n")
-        if args.dependencies:
-            for i in range(len(args.dependencies)):
-                f.write(f"\tcomponent {args.dependencies[i]} \n")
-                with open(f"../{args.dependencies[i]}/hdl/{args.dependencies[i]}.vhd", 'r') as dep:
-                    file_lines = dep.readlines()
-                    start = file_lines.index(f"entity {args.dependencies[i]} is\n")
-                    end = file_lines.index(f"end entity;\n")
-                    if "generic" in file_lines[start+1]:
-                        f.write(f"\t\tgeneric (\n")
-                        j = start + 2
-                        while file_lines[j] != ");\n": #might require \t
-                            f.write(f"\t\t{file_lines[j]}")
-                            j += 1
-                        f.write(f"\t\t);\n")
-                    f.write(f"\t\tport (\n")
-                    j = j + 2
-                    while file_lines[j] != ");\n":
-                        f.write(f"\t\t{file_lines[j]}")
-                        j += 1
-                    f.write(f"\t\t);\n")
-                f.write(f"\tend component;\n")            
-        f.write(f"\tbegin\n\n")
+        comoponent_list = get_component_list(args.dependencies)           
+        for line in comoponent_list:
+            f.write("\t" + line + "\n")
+        f.write(f"begin\n\n")
         f.write(f"end architecture;\n")
 
     with open(f"{getcwd()}/sim/{project_name}_tb.vhd", 'w') as f:
