@@ -1,0 +1,9 @@
+#%SimplAPI=1.0
+
+library: work
+top: ins_mem_tb
+
+dependencies:
+- ../ins_mem.yml
+files:
+- ins_mem_tb.vhd

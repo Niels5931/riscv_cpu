@@ -148,11 +148,11 @@ begin
 	end process;
 
 	-- regfile thingy
-	process(clk_i, rst_i, reg_wr_en_i, reg_wr_addr_i, reg_wr_data_i, ins_data_i)
+	process(clk_i, rst_i, reg_wr_en_i, reg_wr_addr_i, reg_wr_data_i, ins_data_i, reg_file)
 	begin
-		rs1_s <= reg_file((TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
+		rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
 		rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
-		rd_s <= ins_data_i(11 downto 7));
+		rd_s <= ins_data_i(11 downto 7);
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
 				for i in 0 to 31 loop
@@ -202,7 +202,7 @@ begin
 	process(all)
 	begin
 		jmp_valid_s <= is_j_instr;
-		jmp_addr_s <= pc_i + imm_s;
+		jmp_addr_s <= pc_i + imm_s when is_j_instr = '1' else rs1_s + imm_s; -- jal or jalr
 		next_state <= state_reg;
 		jmp_addr_buf_en <= '0';
 		pc_buf_en <= '0';
@@ -318,6 +318,7 @@ begin
 	rs2_addr_o <= rs2_addr_reg;
 	rd_o <= rd_reg;
 	imm_o <= imm_reg;
+	pc_o <= pc_reg;
 	data_mem_wr_en_o <= data_mem_wr_en_reg;
 	data_mem_rd_en_o <= data_mem_rd_en_reg;
 	wb_en_o <= wb_en_reg;

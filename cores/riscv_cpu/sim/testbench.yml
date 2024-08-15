@@ -1,0 +1,9 @@
+#%SimplAPI=1.0
+
+library: work
+top: riscv_cpu_tb
+
+dependencies:
+- ../riscv_cpu.yml
+files:
+- riscv_cpu_tb.vhd

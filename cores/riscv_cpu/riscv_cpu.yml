@@ -1,0 +1,10 @@
+#%SimplAPI=1.0
+
+dependencies:
+- ../package/package.yml
+- ../ins_fetch/ins_fetch.yml
+- ../ins_dec/ins_dec.yml
+- ../ins_exe/ins_exe.yml
+- ../ins_mem/ins_mem.yml
+files:
+- hdl/riscv_cpu.vhd
