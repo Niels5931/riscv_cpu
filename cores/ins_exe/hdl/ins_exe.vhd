@@ -73,7 +73,7 @@ begin
 	begin
 		zero_s <= '1' when alu_res_s = x"00000000" else '0';
 		lt_s <= '0';
-		alu_res_s <= (others => '0');
+		alu_res_s <= rs1_i + rs2_i;
 		if opcode_i = "0110011" or opcode_i = "0010011" then
 			if funct3_i = "000" then
 				-- ADD or SUB
@@ -114,7 +114,10 @@ begin
 			end if;
 		elsif opcode_i = "1100011" then
 			-- branch
-			if funct3_i = "100" or funct3_i = "101" then
+			if funct3_i = "000" or funct3_i = "001" then
+				-- beq or bne
+				zero_s <= '1' when alu_op_1_s = alu_op_2_s else '0';
+			elsif funct3_i = "100" or funct3_i = "101" then
 				-- blt or bge
 				lt_s <= '1' when signed(alu_op_1_s) < signed(alu_op_2_s) else '0';
 			elsif funct3_i = "110" or funct3_i = "111" then
@@ -172,6 +175,25 @@ begin
 				-- jalr or jal
 				alu_op_1_s <= pc_i;
 				alu_op_2_s <= std_logic_vector(to_unsigned(4,32));
+			when "1100011" =>
+				-- B type
+				if funct3_i = "000" or funct3_i = "001" then
+					-- BEQ or BNE
+					if rd_reg = rs1_addr_i then
+						alu_op_1_s <= alu_res_reg;
+					elsif rd_reg_reg = rs1_addr_i then
+						alu_op_1_s <= wb_rd_data_i;
+					else
+						alu_op_1_s <= rs1_i;
+					end if;
+					if rd_reg = rs2_addr_i then
+						alu_op_2_s <= alu_res_reg;
+					elsif rd_reg_reg = rs2_addr_i then
+						alu_op_2_s <= wb_rd_data_i;
+					else
+						alu_op_2_s <= rs2_i;
+					end if;
+				end if;
 			when others =>
 				-- S type
 				alu_op_1_s <= rs1_i;

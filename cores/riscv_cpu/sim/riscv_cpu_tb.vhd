@@ -141,11 +141,13 @@ begin
 		variable i : integer := 0;
 	begin
 		wait until rising_edge(clk_in_s) and rst_in_s = '0';
-		while i < instr_cnt loop
+		loop
+			if ins_mem_data_in_s = x"00000073" then
+				exit;
+			end if;
 			wait until rising_edge(clk_in_s);
-			i := i + 1;
 		end loop;
-		wait for 50 ns; -- allow the last instruction to be executed
+		wait for 40 ns; -- allow the last instruction to be executed
 		std.env.stop(0);
 	end process;
 

@@ -111,6 +111,8 @@ architecture rtl of ins_dec is
 	signal wb_en_s : std_logic; -- write back enable
 	signal wb_en_reg : std_logic; -- write back enable register
 
+	signal flush_s : std_logic;
+
 	signal reg_file : arr(0 to 31)(31 downto 0);
 
 begin
@@ -152,13 +154,12 @@ begin
 	-- regfile thingy
 	process(all)
 	begin
+		rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
+		rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
 		if reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(19 downto 15) then
 			rs1_s <= reg_wr_data_i;
 		elsif reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(24 downto 20) then
 			rs2_s <= reg_wr_data_i;
-		else
-			rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
-			rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
 		end if;
 		rd_s <= ins_data_i(11 downto 7);
 		if rising_edge(clk_i) then
@@ -215,14 +216,14 @@ begin
 		next_state <= state_reg;
 		jmp_addr_buf_en <= '0';
 		pc_buf_en <= '0';
-		flush_o <= '0';
+		flush_s <= '0';
 		case state_reg is 
 			when NOT_TAKEN_TWO =>
 				if branch_taken_s = '1' then
 					next_state <= NOT_TAKEN_ONE;
 					jmp_valid_s <= '1';
 					jmp_addr_s <= jmp_addr_buf;
-					flush_o <= '1';
+					flush_s <= '1';
 				end if;
 				if is_b_instr = '1' then
 					jmp_addr_buf_en <= '1';
@@ -232,7 +233,7 @@ begin
 					next_state <= TAKEN_ONE;
 					jmp_valid_s <= '1';
 					jmp_addr_s <= jmp_addr_buf;
-					flush_o <= '1';
+					flush_s <= '1';
 				elsif is_b_instr_ex_s = '1' then
 					next_state <= NOT_TAKEN_TWO;
 				end if;
@@ -249,7 +250,7 @@ begin
 				end if;
 				if branch_taken_s = '0' and is_b_instr_ex_s = '1' then
 					next_state <= NOT_TAKEN_ONE;
-					flush_o <= '1';
+					flush_s <= '1';
 				elsif branch_taken_s = '1' then
 					next_state <= TAKEN_TWO;
 				end if;
@@ -258,7 +259,7 @@ begin
 					jmp_valid_s <= '1';
 					jmp_addr_s <= pc_buf;
 					next_state <= TAKEN_ONE;
-					flush_o <= '1';
+					flush_s <= '1';
 				elsif is_b_instr = '1' then
 					pc_buf_en <= '1';
 					jmp_valid_s <= '1';
@@ -290,7 +291,7 @@ begin
 	process(clk_i, rst_i)
 	begin
 		if rising_edge(clk_i) then
-			if rst_i = '1' then
+			if rst_i = '1' or flush_s = '1' then
 				opcode_reg <= (others => '0');
 				funct3_reg <= (others => '0');
 				funct7_reg <= (others => '0');
@@ -338,5 +339,6 @@ begin
 	wb_en_o <= wb_en_reg;
 	jmp_addr_o <= jmp_addr_s;
 	jmp_valid_o <= jmp_valid_s;
+	flush_o <= flush_s;
 
 end architecture;
