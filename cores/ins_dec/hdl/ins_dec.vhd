@@ -46,7 +46,9 @@ port (
 	---------------------
 	reg_wr_en_i : in std_logic;
 	reg_wr_addr_i : in std_logic_vector(4 downto 0);
-	reg_wr_data_i : in std_logic_vector(31 downto 0)
+	reg_wr_data_i : in std_logic_vector(31 downto 0);
+	---------------------
+	flush_o : out std_logic
 );
 end entity;
 
@@ -148,10 +150,16 @@ begin
 	end process;
 
 	-- regfile thingy
-	process(clk_i, rst_i, reg_wr_en_i, reg_wr_addr_i, reg_wr_data_i, ins_data_i, reg_file)
+	process(all)
 	begin
-		rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
-		rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
+		if reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(19 downto 15) then
+			rs1_s <= reg_wr_data_i;
+		elsif reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(24 downto 20) then
+			rs2_s <= reg_wr_data_i;
+		else
+			rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
+			rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
+		end if;
 		rd_s <= ins_data_i(11 downto 7);
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
@@ -164,6 +172,7 @@ begin
 				end if;
 			end if;
 		end if;
+		reg_file(0) <= (others => '0'); -- x0 is always zero
 	end process;
 
 	-- state register
@@ -206,12 +215,14 @@ begin
 		next_state <= state_reg;
 		jmp_addr_buf_en <= '0';
 		pc_buf_en <= '0';
+		flush_o <= '0';
 		case state_reg is 
 			when NOT_TAKEN_TWO =>
 				if branch_taken_s = '1' then
 					next_state <= NOT_TAKEN_ONE;
 					jmp_valid_s <= '1';
 					jmp_addr_s <= jmp_addr_buf;
+					flush_o <= '1';
 				end if;
 				if is_b_instr = '1' then
 					jmp_addr_buf_en <= '1';
@@ -221,6 +232,7 @@ begin
 					next_state <= TAKEN_ONE;
 					jmp_valid_s <= '1';
 					jmp_addr_s <= jmp_addr_buf;
+					flush_o <= '1';
 				elsif is_b_instr_ex_s = '1' then
 					next_state <= NOT_TAKEN_TWO;
 				end if;
@@ -237,6 +249,7 @@ begin
 				end if;
 				if branch_taken_s = '0' and is_b_instr_ex_s = '1' then
 					next_state <= NOT_TAKEN_ONE;
+					flush_o <= '1';
 				elsif branch_taken_s = '1' then
 					next_state <= TAKEN_TWO;
 				end if;
@@ -245,6 +258,7 @@ begin
 					jmp_valid_s <= '1';
 					jmp_addr_s <= pc_buf;
 					next_state <= TAKEN_ONE;
+					flush_o <= '1';
 				elsif is_b_instr = '1' then
 					pc_buf_en <= '1';
 					jmp_valid_s <= '1';

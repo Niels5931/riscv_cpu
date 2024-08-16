@@ -52,6 +52,7 @@ architecture rtl of ins_exe is
 	signal zero_s : std_logic;
 	signal lt_s : std_logic;
 	signal alu_res_s : std_logic_vector(31 downto 0);
+	signal mem_data_s : std_logic_vector(31 downto 0);
 	
 	signal alu_op_1_s : std_logic_vector(31 downto 0);
 	signal alu_op_2_s : std_logic_vector(31 downto 0);
@@ -73,14 +74,14 @@ begin
 		zero_s <= '1' when alu_res_s = x"00000000" else '0';
 		lt_s <= '0';
 		alu_res_s <= (others => '0');
-		if opcode_i = "0110111" or opcode_i = "0010111" then
+		if opcode_i = "0110011" or opcode_i = "0010011" then
 			if funct3_i = "000" then
 				-- ADD or SUB
-				if opcode_i = "0110111" then
+				if opcode_i = "0110011" then
 					if funct7_i = "0000000" then
 						alu_res_s <= std_logic_vector(signed(alu_op_1_s) + signed(alu_op_2_s));
 					else
-						alu_res_s <= std_logic_vector(signed(alu_op_1_s) - signed(alu_op_2_s));
+						alu_res_s <= alu_op_1_s - alu_op_2_s;
 					end if;
 				else
 					alu_res_s <= std_logic_vector(signed(alu_op_1_s) + signed(alu_op_2_s));
@@ -111,11 +112,7 @@ begin
 				-- AND
 				alu_res_s <= std_logic_vector(unsigned(alu_op_1_s) and unsigned(alu_op_2_s));
 			end if;
-		else
-			-- other instructions doing addition with different sources
-			alu_res_s <= std_logic_vector(signed(alu_op_1_s) + signed(alu_op_2_s));
-		end if;
-		if opcode_i = "1100011" then
+		elsif opcode_i = "1100011" then
 			-- branch
 			if funct3_i = "100" or funct3_i = "101" then
 				-- blt or bge
@@ -126,6 +123,8 @@ begin
 			else
 				lt_s <= '0';
 			end if;
+		else
+			alu_res_s <= alu_op_1_s + alu_op_2_s;
 		end if;
 	end process;
 
@@ -140,8 +139,8 @@ begin
 				alu_op_2_s <= imm_i;
 				if rd_reg = rs1_addr_i then
 					alu_op_1_s <= alu_res_reg;
-				elsif rd_reg = rs2_addr_i then
-					alu_op_2_s <= alu_res_reg;
+				elsif rd_reg_reg = rs1_addr_i then
+					alu_op_1_s <= wb_rd_data_i;
 				else
 					alu_op_1_s <= rs1_i;
 				end if;
@@ -180,6 +179,17 @@ begin
 		end case;
 	end process;
 
+	-- assign mem data
+	process(all)
+	begin
+		mem_data_s <= rs2_i;
+		if rd_reg = rs2_addr_i then
+			mem_data_s <= alu_res_reg;
+		elsif rd_reg_reg = rs2_addr_i then
+			mem_data_s <= wb_rd_data_i;
+		end if;
+	end process;
+
 	--registers
 	process(clk_i, rst_i)
 	begin
@@ -198,7 +208,7 @@ begin
 				rd_reg <= rd_i;
 				rd_reg_reg <= rd_reg;
 				funct3_reg <= funct3_i;
-				mem_data_reg <= rs2_i;
+				mem_data_reg <= mem_data_s;
 				data_mem_wr_en_reg <= data_mem_wr_en_i;
 				data_mem_rd_en_reg <= data_mem_rd_en_i;
 				wb_en_reg <= wb_en_i;
