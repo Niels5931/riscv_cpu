@@ -87,7 +87,9 @@ architecture rtl of riscv_cpu is
 		---------------------
 		reg_wr_en_i : in std_logic;
 		reg_wr_addr_i : in std_logic_vector(4 downto 0);
-		reg_wr_data_i : in std_logic_vector(31 downto 0)
+		reg_wr_data_i : in std_logic_vector(31 downto 0);
+		---------------------
+		flush_o : out std_logic
 	);
 	end component;
 
@@ -185,6 +187,7 @@ architecture rtl of riscv_cpu is
 	signal ins_dec_wb_en_s : std_logic;
 	signal ins_dec_data_mem_wr_en_s : std_logic;
 	signal ins_dec_data_mem_rd_en_s : std_logic;
+	signal ins_dec_flush_s : std_logic;
 
 	signal ins_exe_zero_s : std_logic;
 	signal ins_exe_lt_s : std_logic;
@@ -207,7 +210,11 @@ architecture rtl of riscv_cpu is
 	signal ins_mem_wb_addr_s : std_logic_vector(4 downto 0);
 	signal ins_mem_wb_en_s : std_logic;
 
+	signal flush_rst_s : std_logic;
+
 begin
+
+	flush_rst_s <= rst_i or ins_dec_flush_s;
 
 	ins_fetch_i0 : ins_fetch
 	port map (
@@ -246,13 +253,14 @@ begin
 		lt_i => ins_exe_lt_s,
 		reg_wr_en_i => ins_mem_wb_en_s,
 		reg_wr_addr_i => ins_mem_wb_addr_s,
-		reg_wr_data_i => ins_mem_wb_data_s
+		reg_wr_data_i => ins_mem_wb_data_s,
+		flush_o => ins_dec_flush_s
 	);
 
 	ins_exe_i0 : ins_exe
 	port map (
 		clk_i => clk_i,
-		rst_i => rst_i,
+		rst_i => flush_rst_s,
 		opcode_i => ins_dec_opcode_s,
 		rs1_i => ins_dec_rs1_s,
 		rs1_addr_i => ins_dec_rs1_addr_s,
