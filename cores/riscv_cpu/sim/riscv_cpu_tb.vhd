@@ -127,21 +127,23 @@ begin
 	
 	-- read instructions
 	process
-		file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
+		--file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
+		file f : text open read_mode is "/home/niels/dtu/sum24/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
 		variable l : line;
 		variable ins : string (1 to 8);
-		variable i : integer := 0;
+		variable i : unsigned(63 downto 0) := (others => '0');
+		variable k : integer := 0;
 	begin
 		while not endfile(f) loop
 			readline(f, l);
 			read(l, ins);
-			ins_mem_arr(i) <= to_std_logic_vector(ins);
+			ins_mem_arr(to_integer(i)) <= to_std_logic_vector(ins);
 			i := i + 1;
+			k := k + 1;
 		end loop;
-		for j in i to 1023 loop
+		for j in k to 1023 loop
 			ins_mem_arr(j) <= (others => '0');
 		end loop;
-		instr_cnt <= i;
 		wait;
 	end process;
 

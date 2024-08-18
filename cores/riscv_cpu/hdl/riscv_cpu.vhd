@@ -88,6 +88,11 @@ architecture rtl of riscv_cpu is
 		---------------------
 		zero_i : in std_logic;
 		lt_i : in std_logic; -- rs1 < rs2
+		alu_res_i : in std_logic_vector(31 downto 0);
+		---------------------
+		-- MEMORY INPUTS --
+		---------------------
+		mem_data_i : in std_logic_vector(31 downto 0); 
 		---------------------
 		-- WRITE BACK INPUTS --
 		---------------------
@@ -130,6 +135,7 @@ architecture rtl of riscv_cpu is
 		data_mem_wr_en_o : out std_logic; -- data memory enable
 		data_mem_rd_en_o : out std_logic; -- data memory enable
 		wb_en_o : out std_logic; -- write back enable
+		alu_res_none_pipe_o : out std_logic_vector(31 downto 0);
 		alu_res_o : out std_logic_vector(31 downto 0);
 		mem_data_o : out std_logic_vector(31 downto 0); -- register to be stored in memory
 		funct3_o : out std_logic_vector(2 downto 0); -- for byte/halfword/word
@@ -201,6 +207,7 @@ architecture rtl of riscv_cpu is
 	signal ins_exe_data_mem_rd_en_s : std_logic;
 	signal ins_exe_wb_en_s : std_logic;
 	signal ins_exe_alu_res_s : std_logic_vector(31 downto 0);
+	signal ins_exe_alu_res_none_pipe_s : std_logic_vector(31 downto 0);
 	signal ins_exe_mem_data_s : std_logic_vector(31 downto 0);
 	signal ins_exe_funct3_s : std_logic_vector(2 downto 0);
 	signal ins_exe_rd_s : std_logic_vector(4 downto 0);
@@ -260,6 +267,8 @@ begin
 		data_mem_rd_en_o => ins_dec_data_mem_rd_en_s,
 		zero_i => ins_exe_zero_s,
 		lt_i => ins_exe_lt_s,
+		alu_res_i => ins_exe_alu_res_none_pipe_s,
+		mem_data_i => ins_mem_mem_wr_data_s,
 		reg_wr_en_i => ins_mem_wb_en_s,
 		reg_wr_addr_i => ins_mem_wb_addr_s,
 		reg_wr_data_i => ins_mem_wb_data_s,
@@ -289,6 +298,7 @@ begin
 		data_mem_rd_en_o => ins_exe_data_mem_rd_en_s,
 		wb_en_o => ins_exe_wb_en_s,
 		alu_res_o => ins_exe_alu_res_s,
+		alu_res_none_pipe_o => ins_exe_alu_res_none_pipe_s,
 		mem_data_o => ins_exe_mem_data_s,
 		funct3_o => ins_exe_funct3_s,
 		rd_o => ins_exe_rd_s,
@@ -311,11 +321,13 @@ begin
 		mem_byte_en_o => data_mem_wr_byte_en_o,
 		mem_wr_addr_o => data_mem_wr_addr_o,
 		mem_rd_addr_o => data_mem_rd_addr_o,
-		mem_wr_data_o => data_mem_wr_data_o,
+		mem_wr_data_o => ins_mem_mem_wr_data_s,
 		mem_rd_data_i => data_mem_rd_data_i,
 		wb_data_o => ins_mem_wb_data_s,
 		wb_addr_o => ins_mem_wb_addr_s,
 		wb_en_o => ins_mem_wb_en_s
 	);
+
+	data_mem_wr_data_o <= ins_mem_mem_wr_data_s;
 
 end architecture;

@@ -41,6 +41,11 @@ port (
 	---------------------
 	zero_i : in std_logic;
 	lt_i : in std_logic; -- rs1 < rs2
+	alu_res_i : in std_logic_vector(31 downto 0); -- forward alu result for jump address calculation
+	---------------------
+	-- MEMORY INPUTS --
+	---------------------
+	mem_data_i : in std_logic_vector(31 downto 0); -- alu result one cycle later if necessary
 	---------------------
 	-- WRITE BACK INPUTS --
 	---------------------
@@ -79,7 +84,9 @@ architecture rtl of ins_dec is
 	signal funct3_s : std_logic_vector(2 downto 0);
 	signal funct7_s : std_logic_vector(6 downto 0);
 	signal rs1_s : std_logic_vector(31 downto 0);
+	signal rs1_addr_s : std_logic_vector(4 downto 0);
 	signal rs2_s : std_logic_vector(31 downto 0);
+	signal rs2_addr_s : std_logic_vector(4 downto 0);
 	signal rd_s : std_logic_vector(4 downto 0);
 	signal imm_s : std_logic_vector(31 downto 0);
 	signal data_mem_wr_en_s : std_logic;
@@ -93,6 +100,7 @@ architecture rtl of ins_dec is
 	signal rs2_reg : std_logic_vector(31 downto 0);
 	signal rs2_addr_reg : std_logic_vector(4 downto 0);
 	signal rd_reg : std_logic_vector(4 downto 0);
+	signal rd_reg_reg : std_logic_vector(4 downto 0);
 	signal pc_reg : std_logic_vector(31 downto 0);
 	signal imm_reg : std_logic_vector(31 downto 0);
 	signal data_mem_wr_en_reg : std_logic;
@@ -120,6 +128,8 @@ begin
 	opcode_s <= ins_data_i(6 downto 0);
 	funct3_s <= ins_data_i(14 downto 12);
 	funct7_s <= ins_data_i(31 downto 25);
+	rs1_addr_s <= ins_data_i(19 downto 15);
+	rs2_addr_s <= ins_data_i(24 downto 20);
 	data_mem_wr_en_s <= '1' when opcode_s = "0100011" else '0';
 	data_mem_rd_en_s <= '1' when opcode_s = "0000011" else '0';	
 	wb_en_s <= '1' when is_r_instr = '1' or is_i_instr = '1' or is_u_instr = '1' or is_j_instr = '1' else '0';
@@ -213,6 +223,7 @@ begin
 
 	-- branch prediction statemachine
 	process(all)
+		variable jalr_rs1 : std_logic_vector(31 downto 0);
 	begin
 		jmp_valid_s <= '1' when is_j_instr = '1' or opcode_s = "1100111" else '0';
 		jmp_addr_s <= pc_i + imm_s when is_j_instr = '1' else rs1_s + imm_s; -- jal or jalr
@@ -220,6 +231,16 @@ begin
 		jmp_addr_buf_en <= '0';
 		pc_buf_en <= '0';
 		flush_s <= '0';
+		jalr_rs1 := rs1_s;
+		if opcode_s = "1100111" then -- jalr
+			if rs1_addr_s = rd_reg then
+				jalr_rs1 := alu_res_i;
+			elsif rd_reg_reg = rs1_addr_s then
+				jalr_rs1 := mem_data_i;
+			end if;
+			jmp_valid_s <= '1';
+			jmp_addr_s <= jalr_rs1 + imm_s;
+		end if;
 		case state_reg is 
 			when NOT_TAKEN_TWO =>
 				if branch_taken_s = '1' then
@@ -301,6 +322,7 @@ begin
 				rs1_reg <= (others => '0');
 				rs2_reg <= (others => '0');
 				rd_reg <= (others => '0');
+				rd_reg_reg <= (others => '0');
 				pc_reg <= (others => '0');
 				imm_reg <= (others => '0');
 				data_mem_wr_en_reg <= '0';
@@ -315,13 +337,14 @@ begin
 				rs1_reg <= rs1_s;
 				rs2_reg <= rs2_s;
 				rd_reg <= rd_s;
+				rd_reg_reg <= rd_reg;
 				pc_reg <= pc_i;
 				imm_reg <= imm_s;
 				data_mem_wr_en_reg <= data_mem_wr_en_s;
 				data_mem_rd_en_reg <= data_mem_rd_en_s;
 				wb_en_reg <= wb_en_s;
-				rs1_addr_reg <= ins_data_i(19 downto 15);
-				rs2_addr_reg <= ins_data_i(24 downto 20);
+				rs1_addr_reg <= rs1_addr_s;
+				rs2_addr_reg <= rs2_addr_s;
 			end if;
 		end if;
 	end process;

@@ -36,6 +36,7 @@ entity ins_exe is
 		data_mem_wr_en_o : out std_logic; -- data memory enable
 		data_mem_rd_en_o : out std_logic; -- data memory enable
 		wb_en_o : out std_logic; -- write back enable
+		alu_res_none_pipe_o : out std_logic_vector(31 downto 0);
 		alu_res_o : out std_logic_vector(31 downto 0);
 		mem_data_o : out std_logic_vector(31 downto 0); -- register to be stored in memory
 		funct3_o : out std_logic_vector(2 downto 0); -- for byte/halfword/word
@@ -236,6 +237,7 @@ begin
 	-- output assignments
 	zero_o <= zero_s;
 	lt_o <= lt_s;
+	alu_res_none_pipe_o <= alu_res_s;
 	alu_res_o <= alu_res_reg;
 	mem_data_o <= mem_data_reg;
 	funct3_o <= funct3_reg;
