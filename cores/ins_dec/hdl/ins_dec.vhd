@@ -156,15 +156,18 @@ begin
 	begin
 		rs1_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(19 downto 15))));
 		rs2_s <= reg_file(TO_INTEGER(unsigned(ins_data_i(24 downto 20))));
-		if reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(19 downto 15) then
+		if reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(19 downto 15) and ins_data_i(19 downto 15) /= "00000" then
 			rs1_s <= reg_wr_data_i;
-		elsif reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(24 downto 20) then
+		elsif reg_wr_en_i = '1' and reg_wr_addr_i = ins_data_i(24 downto 20) and ins_data_i(24 downto 20) /= "00000" then
 			rs2_s <= reg_wr_data_i;
 		end if;
 		rd_s <= ins_data_i(11 downto 7);
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				for i in 0 to 31 loop
+				reg_file(1) <= x"00000000";
+				reg_file(2) <= x"0007fff0";
+				reg_file(3) <= x"10000000";
+				for i in 4 to 31 loop
 					reg_file(i) <= (others => '0');
 				end loop;
 			else
@@ -211,7 +214,7 @@ begin
 	-- branch prediction statemachine
 	process(all)
 	begin
-		jmp_valid_s <= is_j_instr;
+		jmp_valid_s <= '1' when is_j_instr = '1' or opcode_s = "1100111" else '0';
 		jmp_addr_s <= pc_i + imm_s when is_j_instr = '1' else rs1_s + imm_s; -- jal or jalr
 		next_state <= state_reg;
 		jmp_addr_buf_en <= '0';

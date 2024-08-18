@@ -2,6 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use STD.textio.all;
+use IEEE.math_real.all;
 
 library work;
 use work.types.all;
@@ -54,6 +55,9 @@ architecture rtl of riscv_cpu_tb is
 	end function;
 
 	component riscv_cpu is
+	generic (
+		INS_START : std_logic_vector(31 downto 0) := x"00000000"
+	);
 	port (
 		clk_i : in std_logic;
 		rst_i : in std_logic;
@@ -75,8 +79,10 @@ architecture rtl of riscv_cpu_tb is
 	);
 	end component;
 
-	signal ins_mem_arr : arr(0 to 1023)(31 downto 0);	
-	signal data_mem : arr(0 to 1023)(31 downto 0);
+	constant INS_START : std_logic_vector(31 downto 0) := x"00000088";
+
+	signal ins_mem_arr : arr(0 to 2**20-1)(31 downto 0);	
+	signal data_mem : arr(0 to 2**20-1)(31 downto 0);
 
 	signal clk_in_s: std_logic := '0';
 	signal rst_in_s: std_logic := '1';
@@ -94,7 +100,10 @@ architecture rtl of riscv_cpu_tb is
 
 begin
 
-	DUT: riscv_cpu port map (
+	DUT: riscv_cpu generic map (
+		INS_START => INS_START
+	)
+		port map (
 		clk_i => clk_in_s,
 		rst_i => rst_in_s,
 		ins_mem_data_i => ins_mem_data_in_s,
@@ -118,7 +127,7 @@ begin
 	
 	-- read instructions
 	process
-		file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/ins_mem.txt";
+		file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
 		variable l : line;
 		variable ins : string (1 to 8);
 		variable i : integer := 0;
@@ -155,7 +164,7 @@ begin
 	process
 	begin
 		loop
-			wait until rising_edge(clk_in_s);
+			wait until rising_edge(clk_in_s) and rst_in_s = '0';
 			ins_mem_data_in_s <= ins_mem_arr(to_integer(unsigned(ins_mem_addr_out_s))/4);
 		end loop;
 	end process;

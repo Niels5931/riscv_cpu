@@ -6,7 +6,10 @@ library work;
 use work.types.all;
 
 entity riscv_cpu is
-port (
+generic (
+	INS_START : std_logic_vector(31 downto 0) := x"00000000"
+);
+	port (
 	clk_i : in std_logic;
 	rst_i : in std_logic;
 	---------------------
@@ -30,7 +33,10 @@ end entity;
 architecture rtl of riscv_cpu is
 
 	component ins_fetch
-	port (
+	generic (
+		INS_START : std_logic_vector(31 downto 0) := x"00000000"
+	);
+		port (
 		clk_i : in std_logic;
 		rst_i : in std_logic;
 		-- branch prediction logic
@@ -217,6 +223,9 @@ begin
 	flush_rst_s <= rst_i or ins_dec_flush_s;
 
 	ins_fetch_i0 : ins_fetch
+	generic map (
+		INS_START => INS_START
+	)
 	port map (
 		clk_i => clk_i,
 		rst_i => rst_i,

@@ -74,12 +74,18 @@ begin
 	process(mem_rd_data_i, funct3_reg)
 	begin
 		case funct3_reg is
+			when "000" =>
+				-- LB
+				mem_data_ext_s <= sign_ext(mem_rd_data_i(7), 24) & mem_rd_data_i(7 downto 0);
+			when "001" =>
+				-- LH
+				mem_data_ext_s <= sign_ext(mem_rd_data_i(15), 16) & mem_rd_data_i(15 downto 0);	
 			when "100" =>
 			-- LBU
-				mem_data_ext_s <= sign_ext(mem_rd_data_i(7), 24) & mem_rd_data_i(7 downto 0);
+				mem_data_ext_s <= x"000000" & mem_rd_data_i(7 downto 0);
 			when "101" =>
 			-- LHU
-				mem_data_ext_s <= sign_ext(mem_rd_data_i(15), 16) & mem_rd_data_i(15 downto 0);
+				mem_data_ext_s <= x"0000" & mem_rd_data_i(15 downto 0);
 			when others =>
 				mem_data_ext_s <= mem_rd_data_i;
 		end case;
@@ -108,8 +114,8 @@ begin
 	mem_wr_en_o <= data_mem_wr_en_i;
 	mem_rd_en_o <= data_mem_rd_en_i;
 	mem_byte_en_o <= mem_byte_en_s;
-	mem_wr_addr_o <= alu_res_reg;
-	mem_rd_addr_o <= alu_res_reg;
+	mem_wr_addr_o <= alu_res_i;
+	mem_rd_addr_o <= alu_res_i;
 	mem_wr_data_o <= mem_data_i;
 
 	wb_data_o <= wb_data_s;

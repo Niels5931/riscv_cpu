@@ -53,6 +53,8 @@ architecture rtl of ins_exe is
 	signal lt_s : std_logic;
 	signal alu_res_s : std_logic_vector(31 downto 0);
 	signal mem_data_s : std_logic_vector(31 downto 0);
+	signal rs1_s : std_logic_vector(31 downto 0);
+	signal rs2_s : std_logic_vector(31 downto 0);
 	
 	signal alu_op_1_s : std_logic_vector(31 downto 0);
 	signal alu_op_2_s : std_logic_vector(31 downto 0);
@@ -61,6 +63,8 @@ architecture rtl of ins_exe is
 	signal reg_wr_en_reg : std_logic;
 	signal rd_reg : std_logic_vector(4 downto 0);
 	signal rd_reg_reg : std_logic_vector(4 downto 0); 
+	signal opcode_reg : std_logic_vector(6 downto 0);
+	signal opcode_reg_reg : std_logic_vector(6 downto 0);
 	signal mem_data_reg : std_logic_vector(31 downto 0);
 	signal data_mem_wr_en_reg : std_logic;
 	signal data_mem_rd_en_reg : std_logic;
@@ -73,7 +77,7 @@ begin
 	begin
 		zero_s <= '1' when alu_res_s = x"00000000" else '0';
 		lt_s <= '0';
-		alu_res_s <= rs1_i + rs2_i;
+		alu_res_s <= alu_op_1_s + alu_op_2_s;
 		if opcode_i = "0110011" or opcode_i = "0010011" then
 			if funct3_i = "000" then
 				-- ADD or SUB
@@ -131,38 +135,37 @@ begin
 		end if;
 	end process;
 
+	-- only forward rd register if opcode is not store or branch
+	process(all)
+	begin
+		rs1_s <= rs1_i;
+		rs2_s <= rs2_i;
+		if rd_reg = rs1_addr_i and opcode_reg /= "1100011" and opcode_reg /= "0100011" and opcode_reg /= "0000011" and rd_reg /= "00000" then
+			rs1_s <= alu_res_reg;
+		elsif rd_reg_reg = rs1_addr_i and opcode_reg_reg /= "1100011" and opcode_reg_reg /= "0100011" and rd_reg_reg /= "00000" then
+			rs1_s <= wb_rd_data_i;
+		end if;
+		if rd_reg = rs2_addr_i and opcode_reg /= "1100011" and opcode_reg /= "0100011" and opcode_reg /= "0000011" and rd_reg /= "00000" then
+			rs2_s <= alu_res_reg;
+		elsif rd_reg_reg = rs2_addr_i and opcode_reg_reg /= "1100011" and opcode_reg_reg /= "0100011" and rd_reg_reg /= "00000" then
+			rs2_s <= wb_rd_data_i;
+		end if;
+	end process;
+
 	-- ALU operand assignment
 	process(all)
 	begin
-		alu_op_1_s <= rs1_i;
-		alu_op_2_s <= rs2_i;
+		alu_op_1_s <= rs1_s;
+		alu_op_2_s <= rs2_s;
 		case opcode_i is 
 			when "0010011" | "0000011" | "0100011" => 
 				-- I type
 				alu_op_2_s <= imm_i;
-				if rd_reg = rs1_addr_i then
-					alu_op_1_s <= alu_res_reg;
-				elsif rd_reg_reg = rs1_addr_i then
-					alu_op_1_s <= wb_rd_data_i;
-				else
-					alu_op_1_s <= rs1_i;
-				end if;
+				alu_op_1_s <= rs1_s;
 			when "0110011" =>
 				-- R type
-				if rd_reg = rs1_addr_i then
-					alu_op_1_s <= alu_res_reg;
-				elsif rd_reg_reg = rs1_addr_i then
-					alu_op_1_s <= wb_rd_data_i;
-				else
-					alu_op_1_s <= rs1_i;
-				end if;
-				if rd_reg = rs2_addr_i then
-					alu_op_2_s <= alu_res_reg;
-				elsif rd_reg_reg = rs2_addr_i then
-					alu_op_2_s <= wb_rd_data_i;
-				else
-					alu_op_2_s <= rs2_i;
-				end if;
+				alu_op_1_s <= rs1_s;
+				alu_op_2_s <= rs2_s;
 			when "0010111" =>
 				-- auipc
 				alu_op_1_s <= pc_i;
@@ -179,25 +182,13 @@ begin
 				-- B type
 				if funct3_i = "000" or funct3_i = "001" then
 					-- BEQ or BNE
-					if rd_reg = rs1_addr_i then
-						alu_op_1_s <= alu_res_reg;
-					elsif rd_reg_reg = rs1_addr_i then
-						alu_op_1_s <= wb_rd_data_i;
-					else
-						alu_op_1_s <= rs1_i;
-					end if;
-					if rd_reg = rs2_addr_i then
-						alu_op_2_s <= alu_res_reg;
-					elsif rd_reg_reg = rs2_addr_i then
-						alu_op_2_s <= wb_rd_data_i;
-					else
-						alu_op_2_s <= rs2_i;
-					end if;
+					alu_op_1_s <= rs1_s;
+					alu_op_2_s <= rs2_s;
 				end if;
 			when others =>
 				-- S type
-				alu_op_1_s <= rs1_i;
-				alu_op_2_s <= rs2_i;
+				alu_op_1_s <= rs1_s;
+				alu_op_2_s <= rs2_s;
 		end case;
 	end process;
 
@@ -220,6 +211,8 @@ begin
 				alu_res_reg <= (others => '0');
 				rd_reg <= (others => '0');
 				rd_reg_reg <= (others => '0');
+				opcode_reg <= (others => '0');
+				opcode_reg_reg <= (others => '0');
 				funct3_reg <= (others => '0');
 				mem_data_reg <= (others => '0');
 				data_mem_wr_en_reg <= '0';
@@ -229,6 +222,8 @@ begin
 				alu_res_reg <= alu_res_s;
 				rd_reg <= rd_i;
 				rd_reg_reg <= rd_reg;
+				opcode_reg <= opcode_i;
+				opcode_reg_reg <= opcode_reg;
 				funct3_reg <= funct3_i;
 				mem_data_reg <= mem_data_s;
 				data_mem_wr_en_reg <= data_mem_wr_en_i;

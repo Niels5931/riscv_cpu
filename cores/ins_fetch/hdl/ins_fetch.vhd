@@ -6,6 +6,9 @@ library work;
 use work.types.all;
 
 entity ins_fetch is
+	generic (
+		INS_START : std_logic_vector(31 downto 0) := x"00000000"
+	);
 port (
 	clk_i : in std_logic;
 	rst_i : in std_logic;
@@ -42,7 +45,7 @@ begin
 	begin
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				pc_reg <= (others => '0');
+				pc_reg <= INS_START;
 			else
 				pc_reg <= pc_next;
 			end if;
