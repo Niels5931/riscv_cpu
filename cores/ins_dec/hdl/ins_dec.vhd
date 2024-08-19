@@ -271,6 +271,7 @@ begin
 				elsif is_b_instr = '1' then
 					pc_buf_en <= '1';
 					jmp_valid_s <= '1';
+					jmp_addr_s <= pc_i + imm_s;
 				end if;
 				if branch_taken_s = '0' and is_b_instr_ex_s = '1' then
 					next_state <= NOT_TAKEN_ONE;
@@ -287,6 +288,7 @@ begin
 				elsif is_b_instr = '1' then
 					pc_buf_en <= '1';
 					jmp_valid_s <= '1';
+					jmp_addr_s <= pc_i + imm_s;
 				end if;
 			when others =>
 				next_state <= NOT_TAKEN_ONE;
@@ -302,7 +304,7 @@ begin
 				pc_buf <= (others => '0');
 			else
 				if jmp_addr_buf_en = '1' then
-					jmp_addr_buf <= jmp_addr_s;
+					jmp_addr_buf <= jmp_addr_s + pc_i;
 				end if;
 				if pc_buf_en = '1' then
 					pc_buf <= pc_i + 4;
