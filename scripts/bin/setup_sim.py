@@ -20,17 +20,18 @@ def main():
     signal_list = []
 
     for p in ports:
-        if "--" not in p:
+        if not p.strip().startswith("--"):
+            #print(p)
             port_name = p.split(":")[0].strip()
             port_direction = p.split(":")[1].split()[0].strip()
             port_type = p.split(":")[1].split(";")[0].strip()
-            print(port_direction)
+            #print(port_direction)
             if "in" in port_direction:
                 signal_list.append(f"\tsignal {port_name.replace('_i','_in_s')}: {port_type.replace('in','')};\n")
             else:
                 signal_list.append(f"\tsignal {port_name.replace('_o','_out_s')}: {port_type.replace('out','')};\n")
 
-    print(signal_list)
+    #print(signal_list)
 
     with open (f"{work_dir}/sim/{argv[1]}_tb.vhd", 'w') as f:
         f.write(f"library ieee;\n")
@@ -38,7 +39,7 @@ def main():
         f.write(f"use ieee.numeric_std.all;\n\n")
         f.write(f"entity {argv[1]}_tb is\n")
         f.write(f"end entity;\n\n")
-        f.write(f"architecture rtl of {argv[1]}_tb is\n")
+        f.write(f"architecture rtl of {argv[1]}_tb is\n\n")
         f.write(f"\tcomponent {argv[1]} is\n")
         #f.write(f"generic (\n")
         #for g in generics:
@@ -52,15 +53,15 @@ def main():
         for s in signal_list:
             f.write(s)
         
-        f.write(f"begin\n")
+        f.write(f"\nbegin\n\n")
         f.write(f"\tDUT: {argv[1]} port map (\n")
         for p in ports:
-            if "--" not in p:
+            if not p.strip().startswith("--"):
                 if not p == ports[-1]:
                     f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip().replace('_i','_in_s').replace('_o','_out_s')},\n")  
                 else:
                     f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip().replace('_i','_in_s').replace('_o','_out_s')}\n")
-        f.write(f"\t);\n")
+        f.write(f"\t);\n\n")
         f.write(f"end architecture;\n")
 
 

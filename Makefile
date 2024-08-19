@@ -20,5 +20,8 @@ project:
 	cd cores/$(TARGET)/_project/ && vivado -mode tcl -source project.tcl
 	cd cores/$(TARGET)/_project/ && vivado project.xpr
 
+open:
+	cd cores/$(TARGET)/_project/ && vivado project.xpr
+
 check_syntax:
 	source source_simpl && check_syntax.py $(TARGET)
