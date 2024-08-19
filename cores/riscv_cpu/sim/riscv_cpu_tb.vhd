@@ -79,7 +79,7 @@ architecture rtl of riscv_cpu_tb is
 	);
 	end component;
 
-	constant INS_START : std_logic_vector(31 downto 0) := x"00000088";
+	constant INS_START : std_logic_vector(31 downto 0) := x"00000030";
 
 	signal ins_mem_arr : arr(0 to 2**20-1)(31 downto 0);	
 	signal data_mem : arr(0 to 2**20-1)(31 downto 0);
@@ -127,8 +127,8 @@ begin
 	
 	-- read instructions
 	process
-		--file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
-		file f : text open read_mode is "/home/niels/dtu/sum24/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
+		file f : text open read_mode is "/home/niels/riscv_cpu/cores/riscv_cpu/sim/c_func_bran.txt";
+		--file f : text open read_mode is "/home/niels/dtu/sum24/riscv_cpu/cores/riscv_cpu/sim/c_function.txt";
 		variable l : line;
 		variable ins : string (1 to 8);
 		variable i : unsigned(63 downto 0) := (others => '0');
