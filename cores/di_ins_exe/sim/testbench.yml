@@ -1,0 +1,9 @@
+#%SimplAPI=1.0
+
+library: work
+top: di_ins_exe_tb
+
+dependencies:
+- ../di_ins_exe.yml
+files:
+- di_ins_exe_tb.vhd

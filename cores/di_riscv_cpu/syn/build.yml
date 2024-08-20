@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+project: di_riscv_cpu
+part: xc7a35tcpg236-1
+top: di_riscv_cpu
+
+dependencies:
+- ../di_riscv_cpu.yml

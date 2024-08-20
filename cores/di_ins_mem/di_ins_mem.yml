@@ -1,0 +1,6 @@
+#%SimplAPI=1.0
+
+dependencies:
+- ../ins_mem/ins_mem.yml
+files:
+- hdl/di_ins_mem.vhd

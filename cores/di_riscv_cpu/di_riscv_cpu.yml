@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+dependencies:
+- ../di_ins_fetch_dec/di_ins_fetch_dec.yml
+- ../di_ins_exe/di_ins_exe.yml
+- ../di_ins_mem/di_ins_mem.yml
+files:
+- hdl/di_riscv_cpu.vhd

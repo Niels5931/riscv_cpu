@@ -1,0 +1,8 @@
+#%SimplAPI=1.0
+
+project: di_ins_fetch_dec
+part: xc7a35tcpg236-1
+top: di_ins_fetch_dec
+
+dependencies:
+- ../di_ins_fetch_dec.yml

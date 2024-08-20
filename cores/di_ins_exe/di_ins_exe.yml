@@ -1,0 +1,7 @@
+#%SimplAPI=1.0
+
+dependencies:
+- ../package/package.yml
+- ../ins_exe/ins_exe.yml
+files:
+- hdl/di_ins_exe.vhd

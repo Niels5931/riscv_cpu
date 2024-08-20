@@ -1,0 +1,7 @@
+#%SimplAPI=1.0
+
+dependencies:
+- ../package/package.yml
+
+files:
+- hdl/di_ins_fetch_dec.vhd
