@@ -13,7 +13,6 @@ port (
 	clk_i : in std_logic;
 	rst_i : in std_logic;
 	-- program counter
-	pc_o : out std_logic_vector(31 downto 0);
 	-- instruction mem interface
 	ins_mem_data_i : in std_logic_vector(63 downto 0);
 	ins_mem_addr_o : out std_logic_vector(31 downto 0);
@@ -28,6 +27,7 @@ port (
 	funct7_i1_o : out std_logic_vector(6 downto 0);
 	imm_i1_o : out std_logic_vector(31 downto 0);
 	wb_i1_o : out std_logic;
+	pc_i1_o : out std_logic_vector(31 downto 0);
 	opcode_i2_o : out std_logic_vector(6 downto 0);
 	rs1_i2_o : out std_logic_vector(31 downto 0);
 	rs1_i2_addr_o : out std_logic_vector(4 downto 0);
@@ -38,12 +38,14 @@ port (
 	funct7_i2_o : out std_logic_vector(6 downto 0);
 	imm_i2_o : out std_logic_vector(31 downto 0);
 	wb_i2_o : out std_logic;
+	pc_i2_o : out std_logic_vector(31 downto 0);
 	data_mem_wr_en_i2_o : out std_logic;
 	data_mem_rd_en_i2_o : out std_logic;
 	-- execution stage input for branch prediction
 	zero_i1_i : in std_logic;
 	lt_i1_i : in std_logic;
 	alu_res_i1_i : in std_logic_vector(31 downto 0);
+	jmp_addr_alu_res_i : in std_logic_vector(31 downto 0);
 	mem_data_i1_i : in std_logic_vector(31 downto 0); -- alu result on clock cycle later
 	-- write back input
 	reg_wr_en_i1_i : in std_logic;
@@ -70,7 +72,8 @@ architecture rtl of di_ins_fetch_dec is
 	signal ins_data_i2_s : std_logic_vector(31 downto 0);
 
 	signal pc_reg : std_logic_vector(31 downto 0);
-	signal ins_addr_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i1_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i2_reg : std_logic_vector(31 downto 0);
 
 	---------------------
 	-- ins two way control signals --
@@ -121,6 +124,9 @@ architecture rtl of di_ins_fetch_dec is
 	signal data_mem_wr_en_i2_s : std_logic;
 	signal data_mem_rd_en_i2_s : std_logic;
 
+	signal is_i1_j_instr_reg : std_logic;
+	signal is_i1_b_instr_reg : std_logic;
+
 	signal rd_i1_reg : std_logic_vector(4 downto 0);
 	signal rs1_i1_addr_reg : std_logic_vector(4 downto 0);
 	signal rs2_i1_addr_reg : std_logic_vector(4 downto 0);
@@ -144,13 +150,19 @@ architecture rtl of di_ins_fetch_dec is
 	signal ins_data_i1_reg : std_logic_vector(31 downto 0);
 	signal ins_data_i1_pipe : std_logic_vector(31 downto 0);
 	signal ins_data_i1_buff : std_logic_vector(31 downto 0);
+	signal ins_addr_i1_reg_buff : std_logic_vector(31 downto 0);
 	signal ins_data_i1_buff_en : std_logic;
 	signal ins_data_i2_reg : std_logic_vector(31 downto 0);
 	signal ins_data_i2_pipe : std_logic_vector(31 downto 0);
+	signal ins_addr_i2_reg_buff : std_logic_vector(31 downto 0);
 	signal ins_data_i2_buff : std_logic_vector(31 downto 0);
 	signal ins_data_i2_buff_en : std_logic;
 
-	signal ins_addr_reg_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i1_reg_s : std_logic_vector(31 downto 0);
+	signal ins_addr_i2_reg_s : std_logic_vector(31 downto 0);
+	
+	signal ins_addr_i1_reg_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i2_reg_reg : std_logic_vector(31 downto 0);
 
 	---------------------
 	-- ins decode signals --
@@ -188,10 +200,17 @@ architecture rtl of di_ins_fetch_dec is
 	signal data_mem_wr_en_i2_reg_reg : std_logic;
 	signal data_mem_rd_en_i2_reg_reg : std_logic;
 
+	signal is_i1_j_instr_reg_reg : std_logic;
+	signal is_i1_b_instr_reg_reg : std_logic;
+	signal jump_flush_s : std_logic;
+	signal branch_flush_s : std_logic;
+
 	signal jmp_valid_s : std_logic;
 	signal jmp_addr_s : std_logic_vector(31 downto 0);
 	
-	signal ins_addr_reg_reg_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i1_reg_reg_reg : std_logic_vector(31 downto 0);
+	signal ins_addr_i2_reg_reg_reg : std_logic_vector(31 downto 0);
+
 	
 begin
 
@@ -201,7 +220,7 @@ begin
 
 	-- assign in statemachine
 	
-	pc_next <= jmp_addr_s + 4 when jmp_valid_s = '1' else pc_reg + 8;
+	pc_next <= jmp_addr_s + 8 when jmp_valid_s = '1' else pc_reg + 8;
 	ins_mem_addr_s <= jmp_addr_s when jmp_valid_s = '1' else pc_reg;
 
 	-- program counter
@@ -222,9 +241,14 @@ begin
 	begin
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				ins_addr_reg <= (others => '0');
+				ins_addr_i1_reg <= (others => '0');
+				ins_addr_i2_reg <= (others => '0');
+			elsif pc_incr_stall_s = '1' then
+				ins_addr_i1_reg <= ins_addr_i1_reg;
+				ins_addr_i2_reg <= ins_addr_i2_reg;
 			else
-				ins_addr_reg <= ins_mem_addr_s;
+				ins_addr_i1_reg <= ins_mem_addr_s;
+				ins_addr_i2_reg <= ins_mem_addr_s+4;
 			end if;
 		end if;
 	end process;
@@ -303,7 +327,7 @@ begin
 	process(clk_i, rst_i)
 	begin
 		if rising_edge(clk_i) then
-			if rst_i = '1' or zero_out_i1_s = '1' then
+			if rst_i = '1' or zero_out_i1_s = '1' or jump_flush_s = '1' then
 				rd_i1_reg <= (others => '0');
 				rs1_i1_addr_reg <= (others => '0');
 				rs2_i1_addr_reg <= (others => '0');
@@ -329,7 +353,7 @@ begin
 	process(clk_i, rst_i)
 	begin
 		if rising_edge(clk_i) then
-			if rst_i = '1' or zero_out_i2_s = '1' then
+			if rst_i = '1' or zero_out_i2_s = '1' or jump_flush_s = '1' then
 				rd_i2_reg <= (others => '0');
 				rs1_i2_addr_reg <= (others => '0');
 				rs2_i2_addr_reg <= (others => '0');
@@ -358,44 +382,70 @@ begin
 	-- state machine
 	process(all)
 	begin
-		ins_data_i1_s <= ins_mem_data_i(31 downto 0);
 		ins_data_i2_s <= ins_mem_data_i(63 downto 32);
+		ins_data_i1_s <= ins_mem_data_i(31 downto 0);
 		pc_incr_stall_s <= '0';
 		ins_data_i1_buff_en <= '0';
 		ins_data_i2_buff_en <= '0';
 		zero_out_i1_s <= '0';
 		zero_out_i2_s <= '0';
+		ins_addr_i1_reg_s <= ins_addr_i1_reg;
+		ins_addr_i2_reg_s <= ins_addr_i2_reg;
 		ins_pre_dec_state_next <= ins_pre_dec_state_reg;
 		case ins_pre_dec_state_reg is
 			when IDLE =>
-				if i1_valid_s = '1' and i2_valid_s = '1' then
-					-- check for hazards
-					if (rd_i1_s = rs1_i2_addr_s or rd_i1_s = rs2_i2_addr_s) and rd_i1_s /= "00000" then
-						zero_out_i2_s <= '1';
-						pc_incr_stall_s <= '1';
-						ins_data_i2_buff_en <= '1';
-						ins_pre_dec_state_next <= CATCH;
-					elsif (rd_i2_s = rs1_i1_addr_s or rd_i2_s = rs2_i1_addr_s) and rd_i2_s /= "00000" then
-						zero_out_i2_s <= '1';
-						pc_incr_stall_s <= '1';
-						ins_data_i2_buff_en <= '1';
-						ins_pre_dec_state_next <= CATCH;
-					end if;
-				elsif i1_valid_s = '1' then
+				if rst_i = '1' then
+					ins_pre_dec_state_next <= IDLE;
+				elsif opcode_i1_s = "1101111" or opcode_i1_s = "1100111" or opcode_i1_s = "1100011" then
+					-- process jump/stall such that i2 is not executed at the same time
+					zero_out_i2_s <= '1';
 					pc_incr_stall_s <= '1';
 					ins_data_i2_buff_en <= '1';
-					ins_pre_dec_state_next <= I1;
-				elsif i2_valid_s = '1' then
+					ins_pre_dec_state_next <= CATCH;
+				elsif i1_valid_s = '0' then 
+					-- move i1 to i2 and stall i2
+					zero_out_i1_s <= '1';
 					pc_incr_stall_s <= '1';
-					ins_data_i1_buff_en <= '1';
-					ins_pre_dec_state_next <= I2;	
+					ins_data_i2_buff_en <= '1';
+					ins_data_i2_s <= ins_data_i1_s;
+					ins_addr_i2_reg_s <= ins_addr_i1_reg;
+					if i2_valid_s = '1' then
+						ins_pre_dec_state_next <= CATCH;
+					else 
+						ins_pre_dec_state_next <= I1;
+					end if;
+				elsif i2_valid_s = '0' then
+					-- move i2 to i1 in the next cycle
+					zero_out_i2_s <= '1';
+					ins_data_i2_buff_en <= '1';
+					pc_incr_stall_s <= '1';
+					ins_pre_dec_state_next <= I1;
+				elsif i1_valid_s = '1' and i2_valid_s = '1' then
+					-- check for hazards
+					if ((rd_i1_s = rs1_i2_addr_s or rd_i1_s = rs2_i2_addr_s) and rd_i1_s /= "00000") or rd_i1_s = rd_i2_s then
+						zero_out_i2_s <= '1';
+						pc_incr_stall_s <= '1';
+						ins_data_i2_buff_en <= '1';
+						if i2_valid_s = '1' then
+							ins_pre_dec_state_next <= CATCH;
+						else
+							ins_pre_dec_state_next <= I1;
+						end if;
+					end if;
 				end if;
 			when CATCH =>
 				zero_out_i1_s <= '1';
 				ins_data_i2_s <= ins_data_i2_buff;
+				ins_addr_i2_reg_s <= ins_addr_i2_reg_buff;
 				ins_pre_dec_state_next <= IDLE;
+				if opcode_i2_reg = "0000011" and (rd_i2_reg = rs1_i2_addr_s or rd_i2_reg = rs2_i2_addr_s) then
+					ins_pre_dec_state_next <= CATCH;
+					pc_incr_stall_s <= '1';
+					zero_out_i2_s <= '1';
+				end if;
 			when I1 =>
 				ins_data_i1_s <= ins_data_i2_buff;
+				ins_addr_i1_reg_s <= ins_addr_i2_reg_buff;
 				zero_out_i2_s <= '1';
 				ins_pre_dec_state_next <= IDLE;
 			when I2 =>
@@ -417,7 +467,7 @@ begin
 		elsif is_i1_i_instr = '1' and opcode_i1_s /= "0000011" then
 			i1_valid_s <= '1';
 		end if;
-		if is_i2_i_instr = '1' or is_i2_r_instr = '1' or is_i2_s_instr = '1' or is_i2_u_instr = '1' then
+		if (is_i2_i_instr = '1' and opcode_i2_s /= "1100111" ) or is_i2_r_instr = '1' or is_i2_s_instr = '1' or is_i2_u_instr = '1' then
 			i2_valid_s <= '1';
 		end if;
 	end process;
@@ -431,9 +481,11 @@ begin
 			else
 				if ins_data_i1_buff_en = '1' then
 					ins_data_i1_buff <= ins_mem_data_i(31 downto 0);
+					ins_addr_i1_reg_buff <= ins_addr_i1_reg;
 				end if;
 				if ins_data_i2_buff_en = '1' then
 					ins_data_i2_buff <= ins_mem_data_i(63 downto 32);
+					ins_addr_i2_reg_buff <= ins_addr_i2_reg;
 				end if;
 			end if;
 		end if;
@@ -454,9 +506,24 @@ begin
 	begin
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				ins_addr_reg_reg <= (others => '0');
+				ins_addr_i1_reg_reg <= (others => '0');
+				ins_addr_i2_reg_reg <= (others => '0');
 			else
-				ins_addr_reg_reg <= ins_addr_reg;
+				ins_addr_i1_reg_reg <= ins_addr_i1_reg_s;	
+				ins_addr_i2_reg_reg <= ins_addr_i2_reg_s;
+			end if;
+		end if;
+	end process;
+
+	process(clk_i, rst_i)
+	begin
+		if rising_edge(clk_i) then
+			if rst_i = '1' or zero_out_i1_s = '1' then
+				is_i1_j_instr_reg <= '0';
+				is_i1_b_instr_reg <= '0';
+			else
+				is_i1_j_instr_reg <= is_i1_j_instr;
+				is_i1_b_instr_reg <= is_i1_b_instr;
 			end if;
 		end if;
 	end process;
@@ -464,6 +531,27 @@ begin
 	---------------------
 	-- ins decode logic --
 	---------------------
+
+	-- jump or branch logic
+	jump_flush_s <= jmp_valid_s;
+	process(all)
+	begin
+		jmp_valid_s <= '0';
+		jmp_addr_s <= jmp_addr_alu_res_i;
+		if is_i1_j_instr_reg_reg = '1' or opcode_i1_reg_reg = "1100111" then
+			jmp_valid_s <= '1';
+		elsif is_i1_b_instr_reg_reg = '1' then
+			if funct3_i1_reg_reg = "000" and zero_i1_i = '1' then -- beq
+				jmp_valid_s <= '1';
+			elsif funct3_i1_reg_reg = "001" and zero_i1_i = '0' then -- bne
+				jmp_valid_s <= '1';
+			elsif (funct3_i1_reg_reg = "100" or funct3_i1_reg_reg = "110") and lt_i1_i = '1' then -- blt, bltu
+				jmp_valid_s <= '1';
+			elsif (funct3_i1_reg_reg = "101" or funct3_i1_reg_reg = "111") and lt_i1_i = '0' then -- bge, bgeu
+				jmp_valid_s <= '1';
+			end if;
+		end if;
+	end process;
 
 	-- register file
 	process(clk_i, rst_i)
@@ -494,8 +582,9 @@ begin
 		end if;
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				reg_file(1) <= x"0007fff0";
-				reg_file(2) <= x"10000000";
+				reg_file(1) <= x"00000000";
+				reg_file(2) <= x"000007f0";
+				reg_file(3) <= x"10000000";
 				for i in 3 to 31 loop
 					reg_file(i) <= (others => '0');
 				end loop;
@@ -524,7 +613,7 @@ begin
 	process(clk_i, rst_i)
 	begin
 		if rising_edge(clk_i) then
-			if rst_i = '1' then
+			if rst_i = '1' or jump_flush_s = '1' then
 				rs1_i1_reg <= (others => '0');
 				rs1_i1_addr_reg_reg <= (others => '0');
 				rs2_i1_reg <= (others => '0');
@@ -554,7 +643,7 @@ begin
 	process(clk_i, rst_i)
 	begin
 		if rising_edge(clk_i) then
-			if rst_i = '1' then
+			if rst_i = '1' or jump_flush_s = '1' then
 				rs1_i2_reg <= (others => '0');
 				rs1_i2_addr_reg_reg <= (others => '0');
 				rs2_i2_reg <= (others => '0');
@@ -588,9 +677,24 @@ begin
 	begin
 		if rising_edge(clk_i) then
 			if rst_i = '1' then
-				ins_addr_reg_reg_reg <= (others => '0');
+				ins_addr_i1_reg_reg_reg <= (others => '0');
+				ins_addr_i2_reg_reg_reg <= (others => '0');
 			else
-				ins_addr_reg_reg_reg <= ins_addr_reg_reg;
+				ins_addr_i1_reg_reg_reg <= ins_addr_i1_reg_reg;
+				ins_addr_i2_reg_reg_reg <= ins_addr_i2_reg_reg;
+			end if;
+		end if;
+	end process;
+
+	process(clk_i, rst_i)
+	begin
+		if rising_edge(clk_i) then
+			if rst_i = '1' then
+				is_i1_j_instr_reg_reg <= '0';
+				is_i1_b_instr_reg_reg <= '0';
+			else
+				is_i1_j_instr_reg_reg <= is_i1_j_instr_reg;
+				is_i1_b_instr_reg_reg <= is_i1_b_instr_reg;
 			end if;
 		end if;
 	end process;
@@ -606,6 +710,7 @@ begin
 	funct7_i1_o <= funct7_i1_reg_reg;
 	imm_i1_o <= imm_i1_reg_reg;
 	wb_i1_o <= wb_en_i1_reg_reg;
+	pc_i1_o <= ins_addr_i1_reg_reg_reg;
 
 	opcode_i2_o <= opcode_i2_reg_reg;
 	rs1_i2_o <= rs1_i2_reg;
@@ -619,7 +724,8 @@ begin
 	wb_i2_o <= wb_en_i2_reg_reg;
 	data_mem_wr_en_i2_o <= data_mem_wr_en_i2_reg_reg;
 	data_mem_rd_en_i2_o <= data_mem_rd_en_i2_reg_reg;
+	pc_i2_o <= ins_addr_i2_reg_reg_reg;
 
-	pc_o <= ins_addr_reg_reg_reg;
+	
 
 end architecture;

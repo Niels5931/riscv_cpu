@@ -11,7 +11,6 @@ port (
 	clk_i : in std_logic;
 	rst_i : in std_logic;
 	---------------------
-	pc_i : in std_logic_vector(31 downto 0);
 	rs1_i1_i : in std_logic_vector(31 downto 0);
 	rs1_i1_addr_i : in std_logic_vector(4 downto 0);
 	rs2_i1_i : in std_logic_vector(31 downto 0);
@@ -22,6 +21,7 @@ port (
 	funct7_i1_i : in std_logic_vector(6 downto 0);
 	imm_i1_i : in std_logic_vector(31 downto 0);
 	wb_en_i1_i : in std_logic;
+	pc_i1_i : in std_logic_vector(31 downto 0);
 	---------------------
 	rs1_i2_i : in std_logic_vector(31 downto 0);
 	rs1_i2_addr_i : in std_logic_vector(4 downto 0);
@@ -33,6 +33,7 @@ port (
 	funct7_i2_i : in std_logic_vector(6 downto 0);
 	imm_i2_i : in std_logic_vector(31 downto 0);
 	wb_en_i2_i : in std_logic;
+	pc_i2_i : in std_logic_vector(31 downto 0);
 	data_mem_wr_en_i2_i : in std_logic;
 	data_mem_rd_en_i2_i : in std_logic;
 	---------------------
@@ -64,6 +65,9 @@ end entity;
 architecture rtl of di_ins_exe is
 
 	component ins_exe
+	generic (
+		DUAL_ISSUE : boolean := FALSE
+	);
 	port (
 		clk_i : in std_logic;
 		rst_i : in std_logic;
@@ -124,6 +128,8 @@ architecture rtl of di_ins_exe is
 	signal data_mem_wr_en_i2_reg : std_logic;
 	signal data_mem_rd_en_i2_reg : std_logic;
 
+	signal rd_i1_reg_reg : std_logic_vector(4 downto 0);
+
 	-- cross data forwarding
 	signal rs1_i1_s : std_logic_vector(31 downto 0);
 	signal rs1_i1_addr_s : std_logic_vector(4 downto 0);
@@ -152,7 +158,7 @@ begin
 		rs2_i => rs2_i1_s,
 		rs2_addr_i => rs2_i1_addr_i,
 		rd_i => rd_i1_i,
-		pc_i => pc_i,
+		pc_i => pc_i1_i,
 		funct3_i => funct3_i1_i,
 		funct7_i => funct7_i1_i,
 		imm_i => imm_i1_i,
@@ -186,7 +192,7 @@ begin
 		rs2_i => rs2_i2_s,
 		rs2_addr_i => rs2_i2_addr_i,
 		rd_i => rd_i2_i,
-		pc_i => pc_i,
+		pc_i => pc_i2_i,
 		funct3_i => funct3_i2_i,
 		funct7_i => funct7_i2_i,
 		imm_i => imm_i2_i,
@@ -244,15 +250,33 @@ begin
 		end if;
 	end process;
 
+	process(clk_i, rst_i)
+	begin
+		if rising_edge(clk_i) then
+			if rst_i = '1' then
+				rd_i1_reg_reg <= (others => '0');
+			else
+				rd_i1_reg_reg <= rd_i1_reg;
+			end if;
+		end if;
+	end process;
+
 	-- jump alu
 	process(all)
 		variable jmp_addr_op1_s : std_logic_vector(31 downto 0);
 		variable jmp_addr_op2_s : std_logic_vector(31 downto 0);
 	begin
-		jmp_addr_op1_s := pc_i;
-		jmp_addr_op2_s := imm_i1_i;
+		jmp_addr_op1_s := imm_i1_i;
 		if opcode_i1_i = "1100111" then
-			jmp_addr_op2_s := rs1_i1_s;
+			if rd_i1_reg = rs1_i1_addr_i then
+				jmp_addr_op2_s := alu_res_i1_reg;
+			elsif rd_i1_reg_reg = rs1_i1_addr_i then
+				jmp_addr_op2_s := wb_rd_data_i1_i;
+			else
+				jmp_addr_op2_s := rs1_i1_s;
+			end if;
+		else
+			jmp_addr_op2_s := pc_i1_i;
 		end if;
 		jmp_addr_alu_res_s <= jmp_addr_op1_s + jmp_addr_op2_s;
 	end process;

@@ -33,7 +33,6 @@ architecture rtl of di_riscv_cpu is
 		clk_i : in std_logic;
 		rst_i : in std_logic;
 		-- program counter
-		pc_o : out std_logic_vector(31 downto 0);
 		-- instruction mem interface
 		ins_mem_data_i : in std_logic_vector(63 downto 0);
 		ins_mem_addr_o : out std_logic_vector(31 downto 0);
@@ -48,6 +47,7 @@ architecture rtl of di_riscv_cpu is
 		funct7_i1_o : out std_logic_vector(6 downto 0);
 		imm_i1_o : out std_logic_vector(31 downto 0);
 		wb_i1_o : out std_logic;
+		pc_i1_o : out std_logic_vector(31 downto 0);
 		opcode_i2_o : out std_logic_vector(6 downto 0);
 		rs1_i2_o : out std_logic_vector(31 downto 0);
 		rs1_i2_addr_o : out std_logic_vector(4 downto 0);
@@ -58,12 +58,14 @@ architecture rtl of di_riscv_cpu is
 		funct7_i2_o : out std_logic_vector(6 downto 0);
 		imm_i2_o : out std_logic_vector(31 downto 0);
 		wb_i2_o : out std_logic;
+		pc_i2_o : out std_logic_vector(31 downto 0);
 		data_mem_wr_en_i2_o : out std_logic;
 		data_mem_rd_en_i2_o : out std_logic;
 		-- execution stage input for branch prediction
 		zero_i1_i : in std_logic;
 		lt_i1_i : in std_logic;
 		alu_res_i1_i : in std_logic_vector(31 downto 0);
+		jmp_addr_alu_res_i : in std_logic_vector(31 downto 0);
 		mem_data_i1_i : in std_logic_vector(31 downto 0); -- alu result on clock cycle later
 		-- write back input
 		reg_wr_en_i1_i : in std_logic;
@@ -82,7 +84,6 @@ architecture rtl of di_riscv_cpu is
 		clk_i : in std_logic;
 		rst_i : in std_logic;
 		---------------------
-		pc_i : in std_logic_vector(31 downto 0);
 		rs1_i1_i : in std_logic_vector(31 downto 0);
 		rs1_i1_addr_i : in std_logic_vector(4 downto 0);
 		rs2_i1_i : in std_logic_vector(31 downto 0);
@@ -93,6 +94,7 @@ architecture rtl of di_riscv_cpu is
 		funct7_i1_i : in std_logic_vector(6 downto 0);
 		imm_i1_i : in std_logic_vector(31 downto 0);
 		wb_en_i1_i : in std_logic;
+		pc_i1_i : in std_logic_vector(31 downto 0);
 		---------------------
 		rs1_i2_i : in std_logic_vector(31 downto 0);
 		rs1_i2_addr_i : in std_logic_vector(4 downto 0);
@@ -104,6 +106,7 @@ architecture rtl of di_riscv_cpu is
 		funct7_i2_i : in std_logic_vector(6 downto 0);
 		imm_i2_i : in std_logic_vector(31 downto 0);
 		wb_en_i2_i : in std_logic;
+		pc_i2_i : in std_logic_vector(31 downto 0);
 		data_mem_wr_en_i2_i : in std_logic;
 		data_mem_rd_en_i2_i : in std_logic;
 		---------------------
@@ -167,7 +170,6 @@ architecture rtl of di_riscv_cpu is
 	);
 	end component;
 
-	signal ins_dec_pc_s : std_logic_vector(31 downto 0);
 	signal ins_dec_mem_addr_s : std_logic_vector(31 downto 0);
 	signal ins_dec_opcode_i1_s : std_logic_vector(6 downto 0);
 	signal ins_dec_rs1_i1_s : std_logic_vector(31 downto 0);
@@ -179,6 +181,7 @@ architecture rtl of di_riscv_cpu is
 	signal ins_dec_funct7_i1_s : std_logic_vector(6 downto 0);
 	signal ins_dec_imm_i1_s : std_logic_vector(31 downto 0);
 	signal ins_dec_wb_i1_s : std_logic;
+	signal ins_dec_pc_i1_s : std_logic_vector(31 downto 0);
 	signal ins_dec_opcode_i2_s : std_logic_vector(6 downto 0);
 	signal ins_dec_rs1_i2_s : std_logic_vector(31 downto 0);
 	signal ins_dec_rs1_i2_addr_s : std_logic_vector(4 downto 0);
@@ -189,6 +192,7 @@ architecture rtl of di_riscv_cpu is
 	signal ins_dec_funct7_i2_s : std_logic_vector(6 downto 0);
 	signal ins_dec_imm_i2_s : std_logic_vector(31 downto 0);
 	signal ins_dec_wb_i2_s : std_logic;
+	signal ins_dec_pc_i2_s : std_logic_vector(31 downto 0);
 	signal ins_dec_data_mem_wr_en_i2_s : std_logic;
 	signal ins_dec_data_mem_rd_en_i2_s : std_logic;
 	signal ins_dec_flush_s : std_logic;
@@ -229,7 +233,6 @@ begin
 	) port map (
 		clk_i => clk_i,
 		rst_i => rst_i,
-		pc_o => ins_dec_pc_s,
 		ins_mem_data_i => ins_mem_data_i,
 		ins_mem_addr_o => ins_mem_addr_o,
 		opcode_i1_o => ins_dec_opcode_i1_s,
@@ -242,6 +245,7 @@ begin
 		funct7_i1_o => ins_dec_funct7_i1_s,
 		imm_i1_o => ins_dec_imm_i1_s,
 		wb_i1_o => ins_dec_wb_i1_s,
+		pc_i1_o => ins_dec_pc_i1_s,
 		opcode_i2_o => ins_dec_opcode_i2_s,
 		rs1_i2_o => ins_dec_rs1_i2_s,
 		rs1_i2_addr_o => ins_dec_rs1_i2_addr_s,
@@ -252,11 +256,13 @@ begin
 		funct7_i2_o => ins_dec_funct7_i2_s,
 		imm_i2_o => ins_dec_imm_i2_s,
 		wb_i2_o => ins_dec_wb_i2_s,
+		pc_i2_o => ins_dec_pc_i2_s,
 		data_mem_wr_en_i2_o => ins_dec_data_mem_wr_en_i2_s,
 		data_mem_rd_en_i2_o => ins_dec_data_mem_rd_en_i2_s,
 		zero_i1_i => ins_exe_zero_i1_s,
 		lt_i1_i => ins_exe_lt_i1_s,
 		alu_res_i1_i => ins_exe_alu_res_i1_s,
+		jmp_addr_alu_res_i => ins_exe_jmp_addr_alu_res_s,
 		mem_data_i1_i => ins_exe_mem_data_i2_s,
 		reg_wr_en_i1_i => ins_mem_wb_en_i1_s,
 		reg_wr_addr_i1_i => ins_mem_wb_addr_i1_s,
@@ -272,7 +278,6 @@ begin
 	port map (
 		clk_i => clk_i,
 		rst_i => rst_i,
-		pc_i => ins_dec_pc_s,
 		rs1_i1_i => ins_dec_rs1_i1_s,
 		rs1_i1_addr_i => ins_dec_rs1_i1_addr_s,
 		rs2_i1_i => ins_dec_rs2_i1_s,
@@ -283,6 +288,7 @@ begin
 		funct7_i1_i => ins_dec_funct7_i1_s,
 		imm_i1_i => ins_dec_imm_i1_s,
 		wb_en_i1_i => ins_dec_wb_i1_s,
+		pc_i1_i => ins_dec_pc_i1_s,
 		rs1_i2_i => ins_dec_rs1_i2_s,
 		rs1_i2_addr_i => ins_dec_rs1_i2_addr_s,
 		rs2_i2_i => ins_dec_rs2_i2_s,
@@ -293,6 +299,7 @@ begin
 		funct7_i2_i => ins_dec_funct7_i2_s,
 		imm_i2_i => ins_dec_imm_i2_s,
 		wb_en_i2_i => ins_dec_wb_i2_s,
+		pc_i2_i => ins_dec_pc_i2_s,
 		data_mem_wr_en_i2_i => ins_dec_data_mem_wr_en_i2_s,
 		data_mem_rd_en_i2_i => ins_dec_data_mem_rd_en_i2_s,
 		alu_res_i1_o => ins_exe_alu_res_i1_s,

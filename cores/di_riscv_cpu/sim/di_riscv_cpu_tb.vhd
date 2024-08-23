@@ -76,8 +76,8 @@ architecture rtl of di_riscv_cpu_tb is
 
 	constant INS_START : std_logic_vector(31 downto 0) := x"00000000";
 
-	signal ins_mem_arr : arr(0 to 2**10-1)(63 downto 0);	
-	signal data_mem : arr(0 to 2**20-1)(31 downto 0);
+	signal ins_mem_arr : arr(0 to 2**10-1)(7 downto 0);	
+	signal data_mem : arr(0 to 2**15-1)(31 downto 0);
 
 	signal clk_in_s :  std_logic := '0';
 	signal rst_in_s :  std_logic := '1';
@@ -132,16 +132,15 @@ begin
 		while not endfile(f) loop
 			readline(f, l);
 			read(l, ins);
-			ins_mem_arr(to_integer(i))(31 downto 0) <= to_std_logic_vector(ins);
-			readline(f, l);
-			read(l, ins);
-			ins_mem_arr(to_integer(i))(63 downto 32) <= to_std_logic_vector(ins);
+			for j in 0 to 3 loop
+				ins_mem_arr(to_integer(j+i*4)) <= to_std_logic_vector(ins)(j*8+7 downto j*8);
+			end loop;
 			i := i + 1;
-			k := k + 1;
+			--k := k + 4;
 		end loop;
-		for j in k to 1023 loop
-			ins_mem_arr(j) <= (others => '0');
-		end loop;
+		--for j in k to 1023 loop
+		--	ins_mem_arr(j) <= (others => '0');
+		--end loop;
 		wait;
 	end process;
 
@@ -151,21 +150,25 @@ begin
 	begin
 		wait until rising_edge(clk_in_s) and rst_in_s = '0';
 		loop
-			if ins_mem_data_in_s = x"00000073" then
+			if ins_mem_data_in_s(31 downto 0) = x"00000073" or ins_mem_data_in_s(63 downto 32) = x"00000073" then
 				exit;
 			end if;
 			wait until rising_edge(clk_in_s);
 		end loop;
-		wait for 40 ns; -- allow the last instruction to be executed
+		wait for 80 ns; -- allow the last instruction to be executed
 		std.env.stop(0);
 	end process;
 
 	-- instruction memory
 	process
+		variable ins : std_logic_vector(63 downto 0);
 	begin
 		loop
 			wait until rising_edge(clk_in_s) and rst_in_s = '0';
-			ins_mem_data_in_s <= ins_mem_arr(to_integer(unsigned(ins_mem_addr_out_s))/8);
+			for i in 7 downto 0 loop
+				ins(i*8+7 downto i*8) := ins_mem_arr(to_integer(unsigned(ins_mem_addr_out_s+i)));
+			end loop;
+			ins_mem_data_in_s <= ins;
 		end loop;
 	end process;
 
