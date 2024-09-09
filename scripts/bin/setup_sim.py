@@ -18,6 +18,7 @@ def main():
     #generics = top_file[generic_start+1:generic_end]
 
     signal_list = []
+    clk_port = ""
 
     for p in ports:
         if not p.strip().startswith("--"):
@@ -26,10 +27,12 @@ def main():
             port_direction = p.split(":")[1].split()[0].strip()
             port_type = p.split(":")[1].split(";")[0].strip()
             #print(port_direction)
+            if "clk" in port_name:
+                clk_port = port_name[:-2]+"_in_s"
             if "in" in port_direction:
-                signal_list.append(f"\tsignal {port_name.replace('_i','_in_s')}: {port_type.replace('in','')};\n")
+                signal_list.append(f"\tsignal {port_name[:-2]}_in_s : {port_type.replace('in','')};\n")
             else:
-                signal_list.append(f"\tsignal {port_name.replace('_o','_out_s')}: {port_type.replace('out','')};\n")
+                signal_list.append(f"\tsignal {port_name[:-2]}_out_s : {port_type.replace('out','')};\n")
 
     #print(signal_list)
 
@@ -57,11 +60,26 @@ def main():
         f.write(f"\tDUT: {argv[1]} port map (\n")
         for p in ports:
             if not p.strip().startswith("--"):
+                pd = p.split(":")[1].split()[0].strip()
                 if not p == ports[-1]:
-                    f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip().replace('_i','_in_s').replace('_o','_out_s')},\n")  
+                    if "in" in pd:
+                        f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip()[:-2]}_in_s,\n")
+                    else:
+                        f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip()[:-2]}_out_s,\n")
                 else:
-                    f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip().replace('_i','_in_s').replace('_o','_out_s')}\n")
+                    if "in" in pd:
+                        f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip()[:-2]}_in_s\n")
+                    else:
+                        f.write(f"\t\t{p.split(':')[0].strip()} => {p.split(':')[0].strip()[:-2]}_out_s\n")
         f.write(f"\t);\n\n")
+
+        f.write(f"\tprocess\n")
+        f.write(f"\tbegin\n")
+        f.write(f"\t\t{clk_port} <= not {clk_port};\n")
+        f.write(f"\t\twait for 5 ns;\n")
+        f.write(f"\tend process;\n\n")
+
+
         f.write(f"end architecture;\n")
 
 

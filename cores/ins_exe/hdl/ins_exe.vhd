@@ -6,6 +6,9 @@ library work;
 use work.types.all;
 
 entity ins_exe is
+	generic (
+		DUAL_ISSUE : boolean := false
+	);
 	port (
 		clk_i : in std_logic;
 		rst_i : in std_logic;
@@ -102,7 +105,7 @@ begin
 				alu_res_s <= std_logic_vector(to_unsigned(1,32)) when (unsigned(alu_op_1_s) < unsigned(alu_op_2_s)) else std_logic_vector(to_unsigned(0,32));
 			elsif funct3_i = "100" then
 				-- XOR
-				alu_res_s <= std_logic_vector(unsigned(alu_op_1_s) xor unsigned(alu_op_2_s));
+				alu_res_s <= alu_op_1_s xor alu_op_2_s;
 			elsif funct3_i = "101" then
 				-- SRL or SRA
 				if funct7_i = "0000000" then
@@ -178,7 +181,11 @@ begin
 			when "1100111" | "1101111" =>
 				-- jalr or jal
 				alu_op_1_s <= pc_i;
-				alu_op_2_s <= std_logic_vector(to_unsigned(4,32));
+				if DUAL_ISSUE then
+					alu_op_2_s <= std_logic_vector(to_unsigned(8,32));
+				else
+					alu_op_2_s <= std_logic_vector(to_unsigned(4,32));
+				end if;
 			when "1100011" =>
 				-- B type
 				if funct3_i = "000" or funct3_i = "001" then

@@ -11,7 +11,7 @@ def get_component_list(dependencies=None):
     port_list = []
 
     for comp in dependencies:
-        print(comp)
+        #print(comp)
         comp_lines = open(f"{getenv('PROJECT_ROOT')}/cores/{comp}/hdl/{comp}.vhd").readlines()
         comp_lines = [line.strip() for line in comp_lines]
         try:
@@ -20,23 +20,22 @@ def get_component_list(dependencies=None):
         except:
             generic_start = None
             generic_end = None
-
         try:
             port_start = comp_lines.index("port (")
-            port_end = comp_lines.index(");")
+            port_end = comp_lines.index("end entity;")
         except:
             port_start = None
             port_end = None
 
-        print(generic_start, generic_end)
-        print(port_start, port_end)
+        #print(generic_start, generic_end)
+        #print(port_start, port_end)
 
         if generic_start:
             for i in range(generic_start+1, generic_end):
                 comp_lines[i] = "\t" + comp_lines[i]
 
         if port_start:
-            for i in range(port_start+1, port_end):
+            for i in range(port_start+1, port_end-1):
                 comp_lines[i] = "\t" + comp_lines[i]    
 
         if generic_start or port_start:
@@ -45,7 +44,7 @@ def get_component_list(dependencies=None):
         if generic_start:
             port_list.extend(comp_lines[generic_start:generic_end+1])
         if port_start:
-            port_list.extend(comp_lines[port_start:port_end+1])
+            port_list.extend(comp_lines[port_start:port_end])
 
         if generic_start or port_start:
             port_list.append(f"end component;\n")
@@ -61,6 +60,7 @@ def main():
     argparser = argparse.ArgumentParser(description="Create a new project template")
     argparser.add_argument("project_name", help="Name of the project")
     argparser.add_argument("-d", "--dependencies", nargs='+', help="List of dependencies")
+    argparser.add_argument("-p", "--part", help="Part number", default="xc7a35tcpg236-1")
     args = argparser.parse_args()
     
 
@@ -101,9 +101,10 @@ def main():
         f.write(f");\n")
         f.write(f"end entity;\n\n")
         f.write(f"architecture rtl of {project_name} is\n\n")
-        comoponent_list = get_component_list(args.dependencies)           
-        for line in comoponent_list:
-            f.write("\t" + line + "\n")
+        if args.dependencies:
+            comoponent_list = get_component_list(args.dependencies)           
+            for line in comoponent_list:
+                f.write("\t" + line + "\n")
         f.write(f"begin\n\n")
         f.write(f"end architecture;\n")
 
@@ -121,7 +122,7 @@ def main():
     with open(f"{getcwd()}/syn/build.yml", 'w') as f:
         f.write("#%SimplAPI=1.0\n\n")
         f.write(f"project: {project_name}\n")
-        f.write(f"part: INSERT_PART_HERE\n")
+        f.write(f"part: {args.part}\n")
         f.write(f"top: {project_name}\n\n")
         f.write(f"dependencies:\n")
         f.write(f"- ../{project_name}.yml\n")
